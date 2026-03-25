@@ -1,8 +1,11 @@
 """生産工場DX 使用材料入力Webアプリ"""
+import asyncio
+import subprocess
+import sys
 from datetime import date
-from typing import Any
 
 from fastapi import FastAPI, Request, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
@@ -13,6 +16,14 @@ load_dotenv()
 import kintone_client as kc
 
 app = FastAPI(title="生産工場DX 使用材料入力")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://exk1223hafrf.cybozu.com"],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["*"],
+)
+
 templates = Jinja2Templates(directory="templates")
 
 
@@ -68,5 +79,23 @@ async def history(ym: str):
     try:
         records = await kc.get_recent_usage(ym)
         return {"records": records}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ─── API: 月別サマリー即時集計 ──────────────────────────────
+@app.post("/api/run-summary")
+async def run_summary(ym: str):
+    def _run():
+        result = subprocess.run(
+            [sys.executable, "scripts/update_monthly_summary.py", ym],
+            capture_output=True, text=True, timeout=120
+        )
+        if result.returncode != 0:
+            raise Exception(result.stderr or result.stdout)
+        return result.stdout
+    try:
+        output = await asyncio.to_thread(_run)
+        return {"ok": True, "ym": ym, "output": output}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
