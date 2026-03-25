@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>使用材料・消耗品 入力フォーム</title>
+  <style>[x-cloak] { display: none !important; }</style>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -194,9 +195,124 @@
       .form-grid { grid-template-columns: 1fr; }
       .form-grid .full { grid-column: 1; }
     }
+
+    /* ── PINスクリーン ── */
+    .pin-overlay {
+      position: fixed;
+      inset: 0;
+      background: #0d0f14;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+    }
+    .pin-title {
+      font-size: 22px;
+      font-weight: bold;
+      color: #4fc3f7;
+      margin-bottom: 28px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .pin-title svg { width: 24px; height: 24px; fill: #4fc3f7; }
+    .pin-card {
+      background: #1a1d27;
+      border-radius: 16px;
+      padding: 28px 32px 24px;
+      width: 280px;
+    }
+    .pin-hint {
+      font-size: 13px;
+      color: #888;
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .pin-dots {
+      display: flex;
+      justify-content: center;
+      gap: 18px;
+      margin-bottom: 28px;
+    }
+    .pin-dot {
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: #2e3247;
+      border: 2px solid #3a3f5a;
+      transition: background .15s, border-color .15s;
+    }
+    .pin-dot.filled {
+      background: #4fc3f7;
+      border-color: #4fc3f7;
+    }
+    .pin-dot.error {
+      background: #e74c3c;
+      border-color: #e74c3c;
+    }
+    .pin-pad {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+    .pin-btn {
+      background: #252838;
+      border: none;
+      border-radius: 10px;
+      color: #fff;
+      font-size: 18px;
+      font-weight: bold;
+      font-family: inherit;
+      padding: 14px 0;
+      cursor: pointer;
+      transition: background .12s;
+      user-select: none;
+    }
+    .pin-btn:active { background: #4fc3f7; color: #0d0f14; }
+    .pin-btn.empty { background: transparent; cursor: default; }
+    .pin-btn.back-btn { font-size: 20px; }
+    @keyframes pinShake {
+      0%,100% { transform: translateX(0); }
+      20%      { transform: translateX(-8px); }
+      40%      { transform: translateX(8px); }
+      60%      { transform: translateX(-6px); }
+      80%      { transform: translateX(6px); }
+    }
+    .pin-card.shake { animation: pinShake .35s ease; }
   </style>
 </head>
 <body x-data="app()" x-init="init()">
+
+<!-- PINスクリーン -->
+<div class="pin-overlay" x-show="pinScreen" x-cloak>
+  <div class="pin-title">
+    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path d="M18 8h-1V6A5 5 0 0 0 7 6v2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10a2 2 0 0 0-2-2zm-6 9a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm3.1-9H8.9V6a3.1 3.1 0 0 1 6.2 0v2z"/>
+    </svg>
+    生産工場DX
+  </div>
+  <div class="pin-card" :class="{ shake: pinShaking }" :id="'pin-card'">
+    <div class="pin-hint">4桁のパスワードを入力してください</div>
+    <div class="pin-dots">
+      <template x-for="i in 4" :key="i">
+        <div class="pin-dot"
+          :class="{ filled: pinDigits.length >= i && !pinError, error: pinError && pinDigits.length >= i }">
+        </div>
+      </template>
+    </div>
+    <div class="pin-pad">
+      <template x-for="key in ['1','2','3','4','5','6','7','8','9','','0','⌫']" :key="key">
+        <button
+          class="pin-btn"
+          :class="{ 'empty': key === '', 'back-btn': key === '⌫' }"
+          :disabled="key === ''"
+          @click="key === '⌫' ? pinBack() : key !== '' ? pinPress(key) : null"
+          x-text="key">
+        </button>
+      </template>
+    </div>
+  </div>
+</div>
 
 <!-- ヘッダー -->
 <div class="header">
@@ -388,6 +504,40 @@
 <script>
 function app() {
   return {
+    // PINスクリーン
+    pinScreen: true,
+    pinDigits: '',
+    pinError: false,
+    pinShaking: false,
+
+    pinPress(d) {
+      if (this.pinDigits.length >= 4) return;
+      this.pinDigits += d;
+      if (this.pinDigits.length === 4) {
+        this.$nextTick(() => this.pinCheck());
+      }
+    },
+
+    pinBack() {
+      this.pinDigits = this.pinDigits.slice(0, -1);
+      this.pinError = false;
+    },
+
+    pinCheck() {
+      if (this.pinDigits === '5342') {
+        sessionStorage.setItem('pin_ok', '1');
+        this.pinScreen = false;
+      } else {
+        this.pinError = true;
+        this.pinShaking = true;
+        setTimeout(() => {
+          this.pinDigits = '';
+          this.pinError = false;
+          this.pinShaking = false;
+        }, 500);
+      }
+    },
+
     // フォーム状態
     form: {},
     submitting: false,
@@ -399,6 +549,9 @@ function app() {
     toast: { show: false, msg: '', type: 'ok' },
 
     init() {
+      if (sessionStorage.getItem('pin_ok') === '1') {
+        this.pinScreen = false;
+      }
       const today = new Date();
       const y0 = today.getFullYear();
       this.years = [y0 - 2, y0 - 1, y0, y0 + 1];
