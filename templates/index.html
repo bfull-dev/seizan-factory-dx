@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>使用材料・消耗品 入力フォーム</title>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Hiragino Sans", "Meiryo", system-ui, sans-serif;
+      font-size: 14px;
+      background: #f0f2f5;
+      color: #333;
+      min-height: 100vh;
+    }
+
+    /* ── ヘッダー ── */
+    .header {
+      background: #2c3e50;
+      color: #fff;
+      padding: 0;
+    }
+    .header-inner {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .header-icon {
+      width: 32px; height: 32px;
+      background: #e67e22;
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: bold; font-size: 13px; flex-shrink: 0;
+    }
+    .header h1 { font-size: 15px; font-weight: bold; }
+
+    /* ── コンテンツ ── */
+    .content {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 24px 20px;
+    }
+
+    /* ── カード ── */
+    .card {
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+    .card-title {
+      font-size: 14px;
+      font-weight: bold;
+      color: #2c3e50;
+      border-left: 4px solid #3498db;
+      padding-left: 10px;
+      margin-bottom: 20px;
+    }
+
+    /* ── フォーム ── */
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .form-grid .full { grid-column: 1 / -1; }
+
+    .form-group { display: flex; flex-direction: column; gap: 5px; }
+    .form-group label { font-size: 12px; color: #555; font-weight: bold; }
+    .form-group label .req { color: #e74c3c; margin-left: 2px; }
+
+    input[type="text"],
+    input[type="number"],
+    input[type="date"],
+    select,
+    textarea {
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      padding: 8px 10px;
+      font-size: 14px;
+      font-family: inherit;
+      width: 100%;
+      transition: border-color .15s;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: #3498db;
+      box-shadow: 0 0 0 2px rgba(52,152,219,.15);
+    }
+    input[readonly] { background: #f8f9fa; color: #666; }
+    textarea { resize: vertical; min-height: 60px; }
+
+    /* ── オートコンプリート ── */
+    .autocomplete-wrap { position: relative; }
+    .autocomplete-list {
+      position: absolute;
+      top: 100%; left: 0; right: 0;
+      background: #fff;
+      border: 1px solid #ccc;
+      border-top: none;
+      border-radius: 0 0 5px 5px;
+      max-height: 220px;
+      overflow-y: auto;
+      z-index: 100;
+      box-shadow: 0 4px 12px rgba(0,0,0,.1);
+    }
+    .autocomplete-item {
+      padding: 8px 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+    }
+    .autocomplete-item:hover,
+    .autocomplete-item.active { background: #eaf4fc; }
+    .ac-name { font-size: 14px; }
+    .ac-code { font-size: 11px; color: #999; }
+    .ac-price { font-size: 12px; color: #27ae60; margin-left: auto; flex-shrink: 0; }
+
+    /* ── 金額表示 ── */
+    .amount-display {
+      background: #eaf4fc;
+      border: 1px solid #aed6f1;
+      border-radius: 5px;
+      padding: 10px 14px;
+      font-size: 20px;
+      font-weight: bold;
+      color: #2980b9;
+      text-align: right;
+    }
+
+    /* ── ボタン ── */
+    .btn {
+      border: none;
+      border-radius: 5px;
+      padding: 10px 28px;
+      font-size: 14px;
+      font-family: inherit;
+      cursor: pointer;
+      font-weight: bold;
+      transition: background .15s;
+    }
+    .btn-primary { background: #3498db; color: #fff; }
+    .btn-primary:hover { background: #2980b9; }
+    .btn-primary:disabled { background: #aaa; cursor: not-allowed; }
+    .btn-secondary { background: #ecf0f1; color: #555; }
+    .btn-secondary:hover { background: #dfe6e9; }
+
+    /* ── トースト ── */
+    .toast {
+      position: fixed;
+      bottom: 24px; left: 50%;
+      transform: translateX(-50%);
+      padding: 12px 24px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: bold;
+      color: #fff;
+      z-index: 9999;
+      box-shadow: 0 4px 16px rgba(0,0,0,.2);
+      pointer-events: none;
+    }
+    .toast-ok  { background: #27ae60; }
+    .toast-err { background: #e74c3c; }
+
+    /* ── 履歴テーブル ── */
+    .history-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .history-table th {
+      background: #2c3e50;
+      color: #fff;
+      padding: 8px 12px;
+      text-align: left;
+      font-size: 12px;
+    }
+    .history-table td {
+      padding: 7px 12px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .history-table tbody tr:hover td { background: #f8f9fa; }
+    .history-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .no-data { padding: 16px; text-align: center; color: #aaa; }
+
+    @media (max-width: 600px) {
+      .form-grid { grid-template-columns: 1fr; }
+      .form-grid .full { grid-column: 1; }
+    }
+  </style>
+</head>
+<body x-data="app()" x-init="init()">
+
+<!-- ヘッダー -->
+<div class="header">
+  <div class="header-inner">
+    <div class="header-icon">工</div>
+    <h1>生産工場DX ｜ 使用材料・消耗品 入力フォーム</h1>
+  </div>
+</div>
+
+<div class="content">
+
+  <!-- 入力フォーム -->
+  <div class="card">
+    <div class="card-title">使用材料・消耗品の入力</div>
+
+    <div class="form-grid">
+
+      <!-- 対象年月 -->
+      <div class="form-group">
+        <label>対象年月<span class="req">*</span></label>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <select x-model="form.year" style="width:auto;">
+            {% for y in range(current_year - 2, current_year + 2) %}
+            <option value="{{ y }}" {% if y == current_year %}selected{% endif %}>{{ y }}年</option>
+            {% endfor %}
+          </select>
+          <select x-model="form.month" style="width:auto;">
+            {% for m in range(1, 13) %}
+            <option value="{{ m }}" {% if m == current_month %}selected{% endif %}>{{ m }}月</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <!-- 入力日 -->
+      <div class="form-group">
+        <label>入力日（使用日）<span class="req">*</span></label>
+        <input type="date" x-model="form.入力日">
+      </div>
+
+      <!-- 班別 -->
+      <div class="form-group">
+        <label>班別<span class="req">*</span></label>
+        <select x-model="form.班別">
+          <option value="">-- 選択してください --</option>
+          <option>出力班</option>
+          <option>梱包班</option>
+          <option>組付け班</option>
+          <option>洗浄班</option>
+          <option>塗装班</option>
+          <option>磨き班</option>
+          <option>顔班</option>
+          <option>総務</option>
+        </select>
+      </div>
+
+      <!-- 品目名（オートコンプリート） -->
+      <div class="form-group full autocomplete-wrap">
+        <label>品目名<span class="req">*</span>
+          <span style="font-weight:normal;color:#aaa;font-size:11px;margin-left:6px;">（品目名または品目コードで検索）</span>
+        </label>
+        <input
+          type="text"
+          x-model="form.品目名"
+          @input="onItemInput()"
+          @keydown.arrow-down.prevent="acMove(1)"
+          @keydown.arrow-up.prevent="acMove(-1)"
+          @keydown.enter.prevent="acSelect(acIndex)"
+          @keydown.escape="acClose()"
+          @focus="onItemInput()"
+          autocomplete="off"
+          placeholder="例：XL白樹脂 または MAT-001">
+        <!-- サジェストリスト -->
+        <div class="autocomplete-list" x-show="acItems.length > 0" @click.outside="acClose()">
+          <template x-for="(item, i) in acItems" :key="item.品目コード || item.品目名">
+            <div
+              class="autocomplete-item"
+              :class="{ active: i === acIndex }"
+              @mousedown.prevent="acSelect(i)">
+              <span class="ac-name" x-text="item.品目名"></span>
+              <span class="ac-code" x-text="item.品目コード"></span>
+              <span class="ac-price" x-text="'¥' + Number(item.単価).toLocaleString() + ' / ' + item.単位"></span>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- 品目コード（読み取り専用） -->
+      <div class="form-group">
+        <label>品目コード</label>
+        <input type="text" x-model="form.品目コード" readonly placeholder="品目選択で自動入力">
+      </div>
+
+      <!-- 用途区分（読み取り専用） -->
+      <div class="form-group">
+        <label>用途区分</label>
+        <input type="text" x-model="form.用途区分" readonly placeholder="品目選択で自動入力">
+      </div>
+
+      <!-- 数量 -->
+      <div class="form-group">
+        <label>数量<span class="req">*</span>
+          <span style="font-weight:normal;color:#aaa;" x-show="form.単位" x-text="'（単位: ' + form.単位 + '）'"></span>
+        </label>
+        <input type="number" x-model.number="form.数量" min="0" step="any"
+          @input="calcAmount()" placeholder="0">
+      </div>
+
+      <!-- 単価 -->
+      <div class="form-group">
+        <label>単価（円）</label>
+        <input type="number" x-model.number="form.単価" min="0" step="1"
+          @input="calcAmount()" placeholder="品目選択で自動入力">
+      </div>
+
+      <!-- 金額 -->
+      <div class="form-group full">
+        <label>金額（円）</label>
+        <div class="amount-display" x-text="'¥ ' + form.金額.toLocaleString()"></div>
+      </div>
+
+      <!-- 備考 -->
+      <div class="form-group full">
+        <label>備考</label>
+        <textarea x-model="form.備考" placeholder="任意：補足事項があれば入力"></textarea>
+      </div>
+
+    </div><!-- /form-grid -->
+
+    <!-- ボタン -->
+    <div style="display:flex;justify-content:flex-end;gap:12px;margin-top:20px;">
+      <button class="btn btn-secondary" @click="resetForm()">リセット</button>
+      <button class="btn btn-primary" :disabled="submitting || !isValid()" @click="submit()">
+        <span x-show="!submitting">登録する</span>
+        <span x-show="submitting">送信中...</span>
+      </button>
+    </div>
+
+  </div><!-- /card -->
+
+  <!-- 入力履歴 -->
+  <div class="card">
+    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;">
+      <span>入力履歴
+        <span style="font-weight:normal;font-size:12px;color:#888;margin-left:8px;"
+          x-text="form.year + '年' + form.month + '月'"></span>
+      </span>
+      <button class="btn btn-secondary" style="font-size:12px;padding:5px 14px;" @click="loadHistory()">更新</button>
+    </div>
+
+    <template x-if="history.length === 0">
+      <div class="no-data">この月の入力データはありません</div>
+    </template>
+
+    <template x-if="history.length > 0">
+      <div style="overflow-x:auto;">
+        <table class="history-table">
+          <thead>
+            <tr>
+              <th>入力日</th>
+              <th>班別</th>
+              <th>品目名</th>
+              <th class="num">数量</th>
+              <th class="num">金額（円）</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="r in history" :key="r.レコード番号">
+              <tr>
+                <td x-text="r.入力日"></td>
+                <td x-text="r.班別"></td>
+                <td x-text="r.品目名"></td>
+                <td class="num" x-text="r.数量"></td>
+                <td class="num" x-text="'¥' + Number(r.金額).toLocaleString()"></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </template>
+  </div>
+
+</div><!-- /content -->
+
+<!-- トースト通知 -->
+<div class="toast" :class="toast.type === 'ok' ? 'toast-ok' : 'toast-err'"
+  x-show="toast.show" x-transition x-text="toast.msg"></div>
+
+<script>
+function app() {
+  return {
+    // フォーム状態
+    form: {},
+    submitting: false,
+    years: [],
+    inventory: [],   // App791 全件キャッシュ
+    acItems: [],     // サジェスト候補
+    acIndex: -1,
+    history: [],
+    toast: { show: false, msg: '', type: 'ok' },
+
+    init() {
+      const today = new Date();
+      const y0 = today.getFullYear();
+      this.years = [y0 - 2, y0 - 1, y0, y0 + 1];
+      this.resetForm();
+      this.loadInventory();
+      this.loadHistory();
+    },
+
+    resetForm() {
+      const today = new Date().toISOString().slice(0, 10);
+      const now   = new Date();
+      this.form = {
+        year:    {{ current_year }},
+        month:   {{ current_month }},
+        入力日:  today,
+        班別:    '',
+        品目コード: '',
+        品目名:  '',
+        用途区分: '',
+        単位:    '',
+        数量:    '',
+        単価:    '',
+        金額:    0,
+        備考:    '',
+      };
+      this.acItems = [];
+      this.acIndex = -1;
+    },
+
+    async loadInventory() {
+      try {
+        const res = await fetch('/api/inventory');
+        const data = await res.json();
+        this.inventory = data.items || [];
+      } catch (e) {
+        console.error('在庫取得エラー', e);
+      }
+    },
+
+    async loadHistory() {
+      const ym = String(this.form.year) + '/' +
+        String(this.form.month).padStart(2, '0');
+      try {
+        const res = await fetch('/api/history?ym=' + encodeURIComponent(ym));
+        const data = await res.json();
+        this.history = data.records || [];
+      } catch (e) {
+        console.error('履歴取得エラー', e);
+      }
+    },
+
+    // ── オートコンプリート ──
+    onItemInput() {
+      const q = (this.form.品目名 || '').trim().toLowerCase();
+      if (!q) { this.acItems = []; return; }
+      this.acItems = this.inventory.filter(item =>
+        item.品目名.toLowerCase().includes(q) ||
+        item.品目コード.toLowerCase().includes(q)
+      ).slice(0, 10);
+      this.acIndex = -1;
+    },
+
+    acMove(dir) {
+      if (!this.acItems.length) return;
+      this.acIndex = (this.acIndex + dir + this.acItems.length) % this.acItems.length;
+    },
+
+    acSelect(i) {
+      const item = this.acItems[i >= 0 ? i : 0];
+      if (!item) return;
+      this.form.品目名    = item.品目名;
+      this.form.品目コード = item.品目コード;
+      this.form.用途区分  = item.区分;
+      this.form.単位      = item.単位;
+      this.form.単価      = Number(item.単価) || '';
+      this.calcAmount();
+      this.acItems = [];
+      this.acIndex = -1;
+    },
+
+    acClose() { this.acItems = []; this.acIndex = -1; },
+
+    // ── 金額計算 ──
+    calcAmount() {
+      const qty   = parseFloat(this.form.数量) || 0;
+      const price = parseFloat(this.form.単価) || 0;
+      this.form.金額 = Math.round(qty * price);
+    },
+
+    // ── バリデーション ──
+    isValid() {
+      return (
+        this.form.班別 &&
+        this.form.品目名.trim() &&
+        this.form.入力日 &&
+        (parseFloat(this.form.数量) > 0) &&
+        this.form.金額 > 0
+      );
+    },
+
+    // ── 送信 ──
+    async submit() {
+      if (!this.isValid() || this.submitting) return;
+      this.submitting = true;
+      const ym = String(this.form.year) + '/' +
+        String(this.form.month).padStart(2, '0');
+      const payload = {
+        対象年月: ym,
+        入力日:   this.form.入力日,
+        班別:     this.form.班別,
+        品目コード: this.form.品目コード,
+        品目名:   this.form.品目名.trim(),
+        用途区分: this.form.用途区分,
+        数量:     parseFloat(this.form.数量) || 0,
+        単価:     parseFloat(this.form.単価) || 0,
+        金額:     this.form.金額,
+        備考:     this.form.備考,
+      };
+      try {
+        const res = await fetch('/api/usage', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify(payload),
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.detail || '送信失敗');
+        }
+        this.showToast('登録しました：' + payload.品目名, 'ok');
+        this.resetForm();
+        this.loadHistory();
+      } catch (e) {
+        this.showToast('エラー: ' + e.message, 'err');
+      } finally {
+        this.submitting = false;
+      }
+    },
+
+    showToast(msg, type) {
+      this.toast = { show: true, msg, type };
+      setTimeout(() => { this.toast.show = false; }, 3000);
+    },
+  };
+}
+</script>
+</body>
+</html>
