@@ -680,7 +680,7 @@ function app() {
       this.form.用途区分  = item.区分;
       this.form.単位      = item.単位;
       this.form.単価      = Number(item.単価) || '';
-      this.selectedStock  = Number(item.現在庫数) || 0;
+      this.selectedStock  = parseFloat(item.現在庫数 ?? 0);
       this.calcAmount();
       this.acItems = [];
       this.acIndex = -1;
@@ -710,17 +710,32 @@ function app() {
     async submit() {
       if (!this.isValid() || this.submitting) return;
 
-      // 在庫数チェック（品目コードあり＝在庫管理対象の品目のみ）
-      if (this.form.品目コード && this.selectedStock !== null) {
-        const qty = parseFloat(this.form.数量) || 0;
-        if (qty > this.selectedStock) {
-          this.stockAlert = {
-            show:  true,
-            qty:   qty,
-            stock: this.selectedStock,
-            unit:  this.form.単位 || '',
-          };
-          return;   // 送信しない
+      // 在庫数チェック（在庫リストに存在する品目のみ）
+      {
+        // サジェスト選択済みなら selectedStock、未選択なら品目名/コードで在庫を検索
+        let stockQty  = this.selectedStock;
+        let stockUnit = this.form.単位 || '';
+        if (stockQty === null) {
+          const matched = this.inventory.find(item =>
+            (this.form.品目コード && item.品目コード === this.form.品目コード) ||
+            item.品目名 === this.form.品目名.trim()
+          );
+          if (matched) {
+            stockQty  = parseFloat(matched.現在庫数) || 0;
+            stockUnit = matched.単位 || '';
+          }
+        }
+        if (stockQty !== null) {
+          const qty = parseFloat(this.form.数量) || 0;
+          if (qty > stockQty) {
+            this.stockAlert = {
+              show:  true,
+              qty:   qty,
+              stock: stockQty,
+              unit:  stockUnit,
+            };
+            return;   // 送信しない
+          }
         }
       }
 
