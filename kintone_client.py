@@ -177,10 +177,43 @@ async def get_recent_usage(ym: str, limit: int = 20) -> list[dict]:
 
 # ─── 購入→在庫同期（App 794 → App 791）──────────────────────
 
+# App 791 自動作成の対象となる出金区分
+_AUTO_CREATE_区分 = {"樹脂", "変動費（製造用）", "製造用消耗品", "外注費"}
+
+
+async def _create_inventory_record(
+    品目コード: str, 品目名: str, 区分: str, 班別: str, 単価: float
+) -> None:
+    """App 791 に在庫マスタレコードを新規作成する"""
+    payload = {
+        "app": APP_INVENTORY,
+        "record": {
+            "品目コード":    {"value": 品目コード},
+            "品目名":        {"value": 品目名},
+            "区分":          {"value": 区分},
+            "班別":          {"value": 班別},
+            "現在庫数":      {"value": "0"},
+            "移動平均単価":  {"value": str(単価)},
+            "最新単価":      {"value": str(単価)},
+            "累計購入数量":  {"value": "0"},
+            "累計購入金額":  {"value": "0"},
+        },
+    }
+    async with httpx.AsyncClient(timeout=10) as client:
+        resp = await client.post(
+            f"{_base()}/record.json", json=payload,
+            headers=_post_headers(TOKEN_791)
+        )
+        resp.raise_for_status()
+    print(f"[INFO] App791 新規作成: 品目コード='{品目コード}' 区分='{区分}'")
+
+
 async def sync_purchases_to_inventory() -> dict:
     """
     App 794 の未処理購入レコード（在庫品目コードあり）を
     App 791 に反映（在庫数加算・移動平均単価更新）する。
+    出金区分が対象区分（樹脂/変動費（製造用）/製造用消耗品/外注費）の場合、
+    App 791 に品目コードが存在しなければ自動作成する。
     処理済レコードには在庫反映状況='反映済'をセット。
     """
     url = f"{_base()}/records.json"
@@ -193,6 +226,9 @@ async def sync_purchases_to_inventory() -> dict:
         ("fields[3]", "単位価格_税抜"),
         ("fields[4]", "金額"),
         ("fields[5]", "日付"),
+        ("fields[6]", "出金区分"),
+        ("fields[7]", "品目名"),
+        ("fields[8]", "班別"),
     ]
     async with httpx.AsyncClient(timeout=30) as client:
         resp = await client.get(url, params=params, headers=_get_headers(TOKEN_794))
@@ -200,6 +236,7 @@ async def sync_purchases_to_inventory() -> dict:
         purchase_records = resp.json()["records"]
 
     processed = 0
+    created = 0
     errors: list[str] = []
 
     for r in purchase_records:
@@ -209,6 +246,9 @@ async def sync_purchases_to_inventory() -> dict:
         単価       = float(r["単位価格_税抜"]["value"] or 0)
         金額       = float(r["金額"]["value"] or 0)
         日付       = r["日付"]["value"]
+        出金区分   = r["出金区分"]["value"]
+        品目名     = r["品目名"]["value"]
+        班別       = r["班別"]["value"]
 
         if 購入数 <= 0:
             # 数量なし → 処理済にして次へ
@@ -217,9 +257,21 @@ async def sync_purchases_to_inventory() -> dict:
 
         try:
             inv = await _get_inventory_by_code(品目コード)
+
+            # App791 に存在しない場合、対象区分なら自動作成
             if not inv:
-                errors.append(f"品目コード '{品目コード}' がApp791に見つかりません")
-                continue
+                if 出金区分 in _AUTO_CREATE_区分:
+                    await _create_inventory_record(品目コード, 品目名, 出金区分, 班別, 単価)
+                    created += 1
+                    inv = await _get_inventory_by_code(品目コード)
+                    if not inv:
+                        errors.append(f"品目コード '{品目コード}' の自動作成後に取得できませんでした")
+                        continue
+                else:
+                    errors.append(
+                        f"品目コード '{品目コード}' がApp791に存在せず、出金区分 '{出金区分}' は自動作成対象外です"
+                    )
+                    continue
 
             inv_id    = inv["レコード番号"]["value"]
             現在庫数   = float(inv["現在庫数"]["value"] or 0)
@@ -251,8 +303,9 @@ async def sync_purchases_to_inventory() -> dict:
 
     return {
         "processed": processed,
-        "total": len(purchase_records),
-        "errors": errors,
+        "created":   created,
+        "total":     len(purchase_records),
+        "errors":    errors,
     }
 
 
