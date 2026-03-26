@@ -37,6 +37,7 @@ async def get_inventory_items() -> list[dict]:
         ("fields[3]", "移動平均単価"),
         ("fields[4]", "単位"),
         ("fields[5]", "班別"),
+        ("fields[6]", "現在庫数"),
         ("query", "limit 500"),
     ]
     async with httpx.AsyncClient(timeout=10) as client:
