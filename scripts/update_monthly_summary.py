@@ -3,26 +3,36 @@
 Usage:
   python scripts/update_monthly_summary.py          # 当月
   python scripts/update_monthly_summary.py 2026/03  # 指定月
+
+集計元アプリ:
+  App 364: 千秋工場_製造管理（出荷売上）
+  App 723: OEM売上
+  App 794: 出金管理
+  App 795: 使用材料・消耗品入力
+集計先アプリ:
+  App 793: 月別サマリー
 """
 import os
 import sys
 import math
 import httpx
 from datetime import date, datetime
+import calendar
 from dotenv import load_dotenv
 
-# .env 読み込み（ローカル実行時）
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env'))
 
-DOMAIN       = os.getenv("KINTONE_DOMAIN", "exk1223hafrf.cybozu.com")
-TOKEN_364    = os.getenv("KINTONE_TOKEN_364", "")   # 千秋工場_製造管理（出荷売上）
-TOKEN_723    = os.getenv("KINTONE_TOKEN_723", "")   # OEM売上
-TOKEN_792    = os.getenv("KINTONE_TOKEN_792", "")   # 購入経費・使用材料
-TOKEN_793    = os.getenv("KINTONE_TOKEN_793", "")   # 月別サマリー
+DOMAIN      = os.getenv("KINTONE_DOMAIN", "exk1223hafrf.cybozu.com")
+TOKEN_364   = os.getenv("KINTONE_TOKEN_364", "")
+TOKEN_723   = os.getenv("KINTONE_TOKEN_723", "")
+TOKEN_794   = os.getenv("KINTONE_TOKEN_794", "")   # 出金管理
+TOKEN_795   = os.getenv("KINTONE_TOKEN_795", "")   # 使用材料・消耗品入力
+TOKEN_793   = os.getenv("KINTONE_TOKEN_793", "")   # 月別サマリー
 
 APP_SHIPPING = 364
 APP_OEM      = 723
-APP_EXPENSE  = 792
+APP_EXPENSE  = 794
+APP_USAGE    = 795
 APP_SUMMARY  = 793
 
 BASE = f"https://{DOMAIN}/k/v1"
@@ -88,14 +98,8 @@ def ym_to_date_range(ym: str) -> tuple[str, str]:
     """'2026/03' → ('2026-03-01', '2026-03-31')"""
     y, m = int(ym[:4]), int(ym[5:7])
     first = date(y, m, 1)
-    if m == 12:
-        last = date(y + 1, 1, 1).replace(day=1)
-        last = date(y, m, 31)
-    else:
-        last = date(y, m + 1, 1).replace(day=1)
-        import calendar
-        _, last_day = calendar.monthrange(y, m)
-        last = date(y, m, last_day)
+    _, last_day = calendar.monthrange(y, m)
+    last = date(y, m, last_day)
     return first.strftime("%Y-%m-%d"), last.strftime("%Y-%m-%d")
 
 
@@ -126,50 +130,91 @@ def aggregate_oem(ym: str) -> int:
     return total_taxex
 
 
+def aggregate_usage(ym: str) -> dict:
+    """
+    App 795（使用材料・消耗品入力）から製造原価を集計
+    戻り値: { 製造原価_樹脂, 製造原価_変動費 }
+    """
+    if not TOKEN_795:
+        print("  [WARN] KINTONE_TOKEN_795 未設定 → 使用材料 = 0")
+        return {"製造原価_樹脂": 0, "製造原価_変動費": 0}
+
+    d_from, d_to = ym_to_date_range(ym)
+    query = f'日付 >= "{d_from}" and 日付 <= "{d_to}"'
+    records = get_all_records(TOKEN_795, APP_USAGE, query, ["区分", "使用金額"])
+
+    result = {"製造原価_樹脂": 0, "製造原価_変動費": 0}
+    for r in records:
+        cat = r["区分"]["value"]
+        amt = int(float(r["使用金額"]["value"] or 0))
+        if cat == "樹脂":
+            result["製造原価_樹脂"] += amt
+        elif cat == "変動費（製造用）":
+            result["製造原価_変動費"] += amt
+
+    for k, v in result.items():
+        print(f"  {k}: ¥{v:,}")
+    return result
+
+
 def aggregate_expenses(ym: str) -> dict:
     """
-    App 792 から費目区分別集計（購入経費）と使用材料費合計を返す
-    戻り値: {
-        変動費_材料費, 変動費_塗料, 変動費_外注費,
-        固定費_梱包材, 固定費_洗浄関連, その他固定費,
-        使用材料費合計
-    }
+    App 794（出金管理）から出金区分別に集計
+    樹脂・変動費（製造用）は在庫計上のみ（費用集計対象外）
+    戻り値: { 製造用備品, 外注費, 製造用消耗品, 固定費, 人件費, 人材派遣費,
+              水道光熱費, 福利厚生, 開発_実験, 事務用品, 輸送費_送料,
+              設備投資, その他費用 }
     """
-    # 購入経費
-    query_purchase = f'対象年月 = "{ym}" and 入力種別 = "購入経費"'
-    recs_purchase = get_all_records(
-        TOKEN_792, APP_EXPENSE, query_purchase,
-        ["費目区分", "金額"]
-    )
-    # 費目区分マッピング
-    費目map = {
-        "変動費_材料費":  0,
-        "変動費_塗料":    0,
-        "変動費_外注費":  0,
-        "固定費_梱包材":  0,
-        "固定費_洗浄関連": 0,
-        "その他固定費":   0,
+    if not TOKEN_794:
+        print("  [WARN] KINTONE_TOKEN_794 未設定 → 出金管理 = 0")
+        return {k: 0 for k in [
+            "製造用備品", "外注費", "製造用消耗品", "固定費", "人件費",
+            "人材派遣費", "水道光熱費", "福利厚生", "開発_実験",
+            "事務用品", "輸送費_送料", "設備投資", "その他費用"
+        ]}
+
+    d_from, d_to = ym_to_date_range(ym)
+    query = f'日付 >= "{d_from}" and 日付 <= "{d_to}"'
+    records = get_all_records(TOKEN_794, APP_EXPENSE, query, ["出金区分", "金額"])
+
+    # 出金区分 → App793フィールドコード マッピング
+    # 樹脂・変動費（製造用）は在庫計上のみなので除外
+    区分map = {
+        "製造用備品":   "製造用備品",
+        "外注費":       "外注費",
+        "製造用消耗品": "製造用消耗品",
+        "固定費":       "固定費",
+        "人件費":       "人件費",
+        "人材派遣費":   "人材派遣費",
+        "水道光熱費":   "水道光熱費",
+        "福利厚生":     "福利厚生",
+        "開発・実験":   "開発_実験",
+        "事務用品":     "事務用品",
+        "輸送費・送料": "輸送費_送料",
+        "設備投資":     "設備投資",
+        "その他":       "その他費用",
     }
-    for r in recs_purchase:
-        cat = r["費目区分"]["value"]
+
+    result = {v: 0 for v in 区分map.values()}
+    skipped = 0
+    for r in records:
+        cat = r["出金区分"]["value"]
         amt = int(float(r["金額"]["value"] or 0))
-        if cat in 費目map:
-            費目map[cat] += amt
+        if cat in 区分map:
+            result[区分map[cat]] += amt
+        else:
+            # 樹脂・変動費（製造用）は在庫計上のみ → スキップ
+            skipped += amt
 
-    # 使用材料
-    query_usage = f'対象年月 = "{ym}" and 入力種別 = "使用材料・消耗品"'
-    recs_usage = get_all_records(TOKEN_792, APP_EXPENSE, query_usage, ["金額"])
-    usage_total = sum(int(float(r["金額"]["value"] or 0)) for r in recs_usage)
-
-    for k, v in 費目map.items():
-        print(f"  {k}: ¥{v:,}")
-    print(f"  使用材料費合計: ¥{usage_total:,}  ({len(recs_usage)} 件)")
-
-    return {**費目map, "使用材料費合計": usage_total}
+    for k, v in result.items():
+        if v > 0:
+            print(f"  {k}: ¥{v:,}")
+    if skipped > 0:
+        print(f"  在庫計上分（樹脂・変動費製造用）: ¥{skipped:,}（費用集計対象外）")
+    return result
 
 
 def main():
-    # 対象年月を決定
     if len(sys.argv) >= 2:
         ym = sys.argv[1]
     else:
@@ -188,28 +233,46 @@ def main():
     print("[2] OEM売上 集計中...")
     oem = aggregate_oem(ym)
 
-    print("[3] 購入経費・使用材料 集計中...")
+    print("[3] 使用材料（製造原価）集計中...")
+    usage = aggregate_usage(ym)
+
+    print("[4] 出金管理 集計中...")
     expenses = aggregate_expenses(ym)
 
+    # 製造原価合計（CALC フィールドで自動計算されるが参考表示用に算出）
+    製造原価合計 = (
+        usage["製造原価_樹脂"] + usage["製造原価_変動費"] +
+        expenses["製造用備品"] + expenses["外注費"]
+    )
+    全費用合計 = 製造原価合計 + sum(
+        expenses[k] for k in [
+            "製造用消耗品", "固定費", "人件費", "人材派遣費",
+            "水道光熱費", "福利厚生", "開発_実験",
+            "事務用品", "輸送費_送料", "その他費用"
+        ]
+    )
+    総売上 = shipping + oem
+
     values = {
-        "出荷売上_税抜":   shipping,
-        "OEM売上_税抜":   oem,
+        "出荷売上_税抜": shipping,
+        "OEM売上_税抜":  oem,
+        **usage,
         **expenses,
     }
 
-    print("[4] 月別サマリー upsert 中...")
+    print("[5] 月別サマリー upsert 中...")
     upsert_summary(ym, values)
 
     print(f"=== 完了: {ym} のサマリーを更新しました ===")
-    print(f"  総売上_税抜(計算): ¥{shipping + oem:,}")
-    変動計 = expenses["変動費_材料費"] + expenses["変動費_塗料"] + expenses["変動費_外注費"] + expenses["使用材料費合計"]
-    固定計 = expenses["固定費_梱包材"] + expenses["固定費_洗浄関連"] + expenses["その他固定費"]
-    経費合計 = 変動計 + 固定計
-    粗利 = shipping + oem - 経費合計
-    粗利率 = round(粗利 / (shipping + oem) * 100, 1) if (shipping + oem) > 0 else 0
-    print(f"  変動費合計: ¥{変動計:,}  固定費合計: ¥{固定計:,}")
-    print(f"  経費合計: ¥{経費合計:,}")
-    print(f"  粗利: ¥{粗利:,}  粗利率: {粗利率}%")
+    print(f"  総売上_税抜:         ¥{総売上:,}")
+    print(f"  製造原価合計:        ¥{製造原価合計:,}")
+    print(f"  全費用合計:          ¥{全費用合計:,}  ※設備投資除く")
+    print(f"  設備投資（参考）:    ¥{expenses['設備投資']:,}")
+    if 総売上 > 0:
+        r1 = round((総売上 - 製造原価合計) / 総売上 * 100, 1)
+        r2 = round((総売上 - 全費用合計) / 総売上 * 100, 1)
+        print(f"  粗利率（製造原価ベース）: {r1}%")
+        print(f"  粗利率（全費用ベース）:   {r2}%")
 
 
 if __name__ == "__main__":
