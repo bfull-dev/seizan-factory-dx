@@ -186,7 +186,7 @@ async def sync_purchases_to_inventory() -> dict:
     url = f"{_base()}/records.json"
     params = [
         ("app", APP_PURCHASE),
-        ("query", '在庫品目コード != "" and 在庫反映状況 = "未処理" order by 日付 asc limit 100'),
+        ("query", '在庫品目コード != "" and (在庫反映状況 = "未処理" or 在庫反映状況 = "") order by 日付 asc limit 100'),
         ("fields[0]", "レコード番号"),
         ("fields[1]", "在庫品目コード"),
         ("fields[2]", "購入数"),
