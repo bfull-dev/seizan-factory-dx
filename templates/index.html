@@ -640,12 +640,13 @@
           <input
             type="text"
             x-model="form.品目名"
-            @input="onItemInput()"
+            @input="onItemInput($event)"
+            @compositionend="onItemInput($event)"
             @keydown.arrow-down.prevent="acMove(1)"
             @keydown.arrow-up.prevent="acMove(-1)"
             @keydown.enter.prevent="acSelect(acIndex)"
             @keydown.escape="acClose()"
-            @focus="onItemInput()"
+            @focus="onItemInput($event)"
             autocomplete="off"
             placeholder="例：XL白樹脂 または MAT-001">
           <div class="autocomplete-list" x-show="acItems.length > 0" @click.outside="acClose()">
@@ -1072,8 +1073,9 @@ function app() {
       }
     },
 
-    onItemInput() {
-      const q = (this.form.品目名 || '').trim().toLowerCase();
+    onItemInput(e) {
+      const val = (e?.target?.value ?? this.form.品目名 ?? '');
+      const q = val.trim().toLowerCase();
       if (!q) { this.acItems = []; return; }
       this.acItems = this.inventory.filter(item =>
         item.品目名.toLowerCase().includes(q) ||

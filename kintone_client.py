@@ -45,8 +45,11 @@ async def get_inventory_items() -> list[dict]:
         resp.raise_for_status()
         records = resp.json()["records"]
 
-    return [
-        {
+    # 品目コードで重複除去（在庫数が多いレコードを優先）
+    seen: dict[str, dict] = {}
+    for r in records:
+        code = r["品目コード"]["value"] or r["品目名"]["value"]
+        item = {
             "品目コード": r["品目コード"]["value"],
             "品目名":    r["品目名"]["value"],
             "区分":      r["区分"]["value"],
@@ -55,8 +58,9 @@ async def get_inventory_items() -> list[dict]:
             "班別":      r["班別"]["value"],
             "現在庫数":  r["現在庫数"]["value"] or "0",
         }
-        for r in records
-    ]
+        if code not in seen or float(item["現在庫数"]) > float(seen[code]["現在庫数"]):
+            seen[code] = item
+    return list(seen.values())
 
 
 async def _get_inventory_by_code(品目コード: str) -> dict | None:
