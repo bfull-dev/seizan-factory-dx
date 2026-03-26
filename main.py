@@ -4,7 +4,7 @@ import subprocess
 import sys
 from datetime import date
 
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -85,13 +85,20 @@ async def history(ym: str):
 
 # ─── API: 購入→在庫同期 ────────────────────────────────────
 @app.post("/api/sync-inventory")
-async def sync_inventory():
-    """App794 未処理購入レコードを App791 在庫に反映する"""
-    try:
-        result = await kc.sync_purchases_to_inventory()
-        return {"ok": True, **result}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+async def sync_inventory(background_tasks: BackgroundTasks):
+    """
+    App794 未処理購入レコードを App791 在庫に反映する。
+    Kintoneウェブフック・手動どちらからでも呼び出し可。
+    即座に 200 OK を返し、処理はバックグラウンドで実行する。
+    """
+    async def _run():
+        try:
+            await kc.sync_purchases_to_inventory()
+        except Exception as e:
+            print(f"[sync-inventory ERROR] {e}")
+
+    background_tasks.add_task(_run)
+    return {"ok": True, "message": "在庫同期を開始しました（バックグラウンド処理）"}
 
 
 # ─── API: 月別サマリー即時集計 ──────────────────────────────
