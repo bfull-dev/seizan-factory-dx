@@ -145,6 +145,25 @@ async def create_usage_record(data: dict[str, Any]) -> dict:
     return result
 
 
+async def get_usage_record(record_id: str) -> dict:
+    """App 792 の使用材料レコードを1件取得（フォームコピー用）"""
+    url = f"{_base()}/record.json"
+    params = [("app", APP_USAGE), ("id", record_id)]
+    async with httpx.AsyncClient(timeout=10) as client:
+        resp = await client.get(url, params=params, headers=_get_headers(TOKEN_792))
+        resp.raise_for_status()
+        r = resp.json()["record"]
+    return {
+        "班別":      r["班別"]["value"],
+        "品目コード": r["品目コード"]["value"],
+        "品目名":    r["品目名"]["value"],
+        "用途区分":  r["用途区分"]["value"],
+        "数量":      r["数量"]["value"] or "0",
+        "単価":      r["単価"]["value"] or "0",
+        "備考":      r["備考"]["value"],
+    }
+
+
 async def get_recent_usage(ym: str, limit: int = 20) -> list[dict]:
     """直近の使用材料入力履歴を取得する"""
     url = f"{_base()}/records.json"
@@ -330,3 +349,144 @@ async def _mark_purchase_processed(record_id: str) -> None:
             headers=_post_headers(TOKEN_794)
         )
         resp.raise_for_status()
+
+
+# ─── 購入入力（App 794）────────────────────────────────────────
+
+async def get_purchase_suggestions() -> list[dict]:
+    """App 794 の過去購入レコードをサジェスト用に取得（品目名で重複除去・最新値優先）"""
+    url = f"{_base()}/records.json"
+    params = [
+        ("app", APP_PURCHASE),
+        ("fields[0]",  "品目名"),
+        ("fields[1]",  "在庫品目コード"),
+        ("fields[2]",  "購入先"),
+        ("fields[3]",  "購入単価"),
+        ("fields[4]",  "何個入り"),
+        ("fields[5]",  "単位"),
+        ("fields[6]",  "課税対象"),
+        ("fields[7]",  "ドル単価"),
+        ("fields[8]",  "ドル円"),
+        ("fields[9]",  "出金区分"),
+        ("query", "order by 作成日時 desc limit 300"),
+    ]
+    async with httpx.AsyncClient(timeout=15) as client:
+        resp = await client.get(url, params=params, headers=_get_headers(TOKEN_794))
+        resp.raise_for_status()
+        records = resp.json()["records"]
+
+    seen: set[str] = set()
+    suggestions = []
+    for r in records:
+        name = r["品目名"]["value"]
+        if name and name not in seen:
+            seen.add(name)
+            suggestions.append({
+                "品目名":        name,
+                "在庫品目コード": r["在庫品目コード"]["value"],
+                "購入先":        r["購入先"]["value"],
+                "購入単価":      r["購入単価"]["value"] or "0",
+                "何個入り":      r["何個入り"]["value"] or "1",
+                "単位":          r["単位"]["value"],
+                "課税対象":      r["課税対象"]["value"],
+                "ドル単価":      r["ドル単価"]["value"] or "0",
+                "ドル円":        r["ドル円"]["value"] or "160",
+                "出金区分":      r["出金区分"]["value"],
+            })
+    return suggestions
+
+
+async def create_purchase_record(data: dict[str, Any]) -> dict:
+    """App 794 に購入レコードを登録する"""
+    url = f"{_base()}/record.json"
+    record: dict[str, Any] = {
+        "日付":           {"value": data["日付"]},
+        "班":             {"value": data["班"]},
+        "出金区分":       {"value": data["出金区分"]},
+        "品目名":         {"value": data["品目名"]},
+        "在庫品目コード": {"value": data.get("在庫品目コード", "")},
+        "購入先":         {"value": data.get("購入先", "")},
+        "課税対象":       {"value": data.get("課税対象", "国内")},
+        "購入数量":       {"value": str(data.get("購入数量", ""))},
+        "何個入り":       {"value": str(data.get("何個入り", 1))},
+        "単位":           {"value": data.get("単位", "式")},
+        "購入単価":       {"value": str(data.get("購入単価", ""))},
+        "備考":           {"value": data.get("備考", "")},
+    }
+    if data.get("課税対象") == "海外｜非課税":
+        record["ドル単価"] = {"value": str(data.get("ドル単価", ""))}
+        record["ドル円"]   = {"value": str(data.get("ドル円", "160"))}
+
+    payload = {"app": APP_PURCHASE, "record": record}
+    async with httpx.AsyncClient(timeout=10) as client:
+        resp = await client.post(url, json=payload, headers=_post_headers(TOKEN_794))
+        resp.raise_for_status()
+        return resp.json()
+
+
+async def get_purchase_record(record_id: str) -> dict:
+    """App 794 の購入レコードを1件取得（フォームコピー用）"""
+    url = f"{_base()}/record.json"
+    params = [("app", APP_PURCHASE), ("id", record_id)]
+    async with httpx.AsyncClient(timeout=10) as client:
+        resp = await client.get(url, params=params, headers=_get_headers(TOKEN_794))
+        resp.raise_for_status()
+        r = resp.json()["record"]
+    return {
+        "品目名":        r["品目名"]["value"],
+        "在庫品目コード": r["在庫品目コード"]["value"],
+        "班":            r["班"]["value"],
+        "出金区分":      r["出金区分"]["value"],
+        "購入先":        r["購入先"]["value"],
+        "課税対象":      r["課税対象"]["value"],
+        "購入数量":      r["購入数量"]["value"] or "0",
+        "何個入り":      r["何個入り"]["value"] or "1",
+        "単位":          r["単位"]["value"],
+        "購入単価":      r["購入単価"]["value"] or "0",
+        "ドル単価":      r["ドル単価"]["value"] or "0",
+        "ドル円":        r["ドル円"]["value"] or "160",
+        "備考":          r["備考"]["value"],
+    }
+
+
+async def get_recent_purchases(ym: str, limit: int = 30) -> list[dict]:
+    """App 794 の直近購入履歴を取得する"""
+    url = f"{_base()}/records.json"
+    # ym は "YYYY/MM" 形式
+    year, month = ym.split("/")
+    query = (
+        f'日付 >= "{year}-{month}-01" and 日付 <= "{year}-{month}-31" '
+        f'order by 日付 desc limit {limit}'
+    )
+    params = [
+        ("app", APP_PURCHASE),
+        ("fields[0]", "レコード番号"),
+        ("fields[1]", "日付"),
+        ("fields[2]", "班"),
+        ("fields[3]", "品目名"),
+        ("fields[4]", "出金区分"),
+        ("fields[5]", "購入数量"),
+        ("fields[6]", "何個入り"),
+        ("fields[7]", "税込み額"),
+        ("fields[8]", "在庫反映状況"),
+        ("query", query),
+    ]
+    async with httpx.AsyncClient(timeout=10) as client:
+        resp = await client.get(url, params=params, headers=_get_headers(TOKEN_794))
+        resp.raise_for_status()
+        records = resp.json()["records"]
+
+    return [
+        {
+            "レコード番号":   r["レコード番号"]["value"],
+            "日付":          r["日付"]["value"],
+            "班":            r["班"]["value"],
+            "品目名":        r["品目名"]["value"],
+            "出金区分":      r["出金区分"]["value"],
+            "購入数量":      r["購入数量"]["value"],
+            "何個入り":      r["何個入り"]["value"],
+            "税込み額":      r["税込み額"]["value"],
+            "在庫反映状況":  r["在庫反映状況"]["value"],
+        }
+        for r in records
+    ]

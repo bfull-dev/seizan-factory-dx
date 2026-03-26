@@ -1,4 +1,4 @@
-"""生産工場DX 使用材料入力Webアプリ"""
+"""千秋工場・赤見工場 使用材料入力Webアプリ"""
 import asyncio
 import subprocess
 import sys
@@ -15,7 +15,7 @@ load_dotenv()
 
 import kintone_client as kc
 
-app = FastAPI(title="生産工場DX 使用材料入力")
+app = FastAPI(title="千秋工場・赤見工場 使用材料入力")
 
 app.add_middleware(
     CORSMiddleware,
@@ -79,6 +79,81 @@ async def history(ym: str):
     try:
         records = await kc.get_recent_usage(ym)
         return {"records": records}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ─── API: 購入サジェスト ────────────────────────────────────
+@app.get("/api/purchase-suggestions")
+async def purchase_suggestions():
+    """App 794 の過去購入レコードをサジェスト用に返す"""
+    try:
+        items = await kc.get_purchase_suggestions()
+        return {"items": items}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ─── API: 購入レコード登録 ──────────────────────────────────
+class PurchaseIn(BaseModel):
+    日付:           str
+    班:             str
+    出金区分:       str
+    品目名:         str
+    在庫品目コード: str = ""
+    購入先:         str = ""
+    課税対象:       str = "国内"
+    購入数量:       float = Field(ge=0)
+    何個入り:       float = Field(ge=1, default=1)
+    単位:           str = "式"
+    購入単価:       float = Field(ge=0)
+    ドル単価:       float = 0
+    ドル円:         float = 160
+    備考:           str = ""
+
+
+@app.post("/api/purchase")
+async def create_purchase(body: PurchaseIn, background_tasks: BackgroundTasks):
+    try:
+        result = await kc.create_purchase_record(body.model_dump())
+        if body.在庫品目コード:
+            async def _sync():
+                try:
+                    await kc.sync_purchases_to_inventory()
+                except Exception as e:
+                    print(f"[purchase-sync ERROR] {e}")
+            background_tasks.add_task(_sync)
+        return {"id": result.get("id"), "revision": result.get("revision")}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ─── API: 購入履歴 ──────────────────────────────────────────
+@app.get("/api/purchase-history")
+async def purchase_history(ym: str):
+    try:
+        records = await kc.get_recent_purchases(ym)
+        return {"records": records}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ─── API: 使用材料レコード1件取得 ──────────────────────────
+@app.get("/api/usage/{record_id}")
+async def get_usage(record_id: str):
+    try:
+        data = await kc.get_usage_record(record_id)
+        return data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ─── API: 購入レコード1件取得 ───────────────────────────────
+@app.get("/api/purchase/{record_id}")
+async def get_purchase(record_id: str):
+    try:
+        data = await kc.get_purchase_record(record_id)
+        return data
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

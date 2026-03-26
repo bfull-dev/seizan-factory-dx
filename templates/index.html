@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>使用材料・消耗品 入力フォーム</title>
+  <title>千秋工場・赤見工場 ｜ 材料購入 ＆ 在庫利用 入力フォーム</title>
   <style>[x-cloak] { display: none !important; }</style>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
   <style>
@@ -18,178 +18,156 @@
     }
 
     /* ── ヘッダー ── */
-    .header {
-      background: #2c3e50;
-      color: #fff;
-      padding: 0;
-    }
+    .header { background: #2c3e50; color: #fff; padding: 0; }
     .header-inner {
-      max-width: 900px;
-      margin: 0 auto;
-      padding: 12px 20px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
+      max-width: 960px; margin: 0 auto; padding: 12px 20px;
+      display: flex; align-items: center; gap: 12px;
     }
     .header-icon {
-      width: 32px; height: 32px;
-      background: #e67e22;
-      border-radius: 6px;
+      width: 32px; height: 32px; background: #e67e22; border-radius: 6px;
       display: flex; align-items: center; justify-content: center;
       font-weight: bold; font-size: 13px; flex-shrink: 0;
     }
     .header h1 { font-size: 15px; font-weight: bold; }
 
-    /* ── コンテンツ ── */
-    .content {
-      max-width: 900px;
-      margin: 0 auto;
-      padding: 24px 20px;
+    /* ── タブナビ ── */
+    .tab-nav { background: #243342; }
+    .tab-nav-inner {
+      max-width: 960px; margin: 0 auto; padding: 0 20px; display: flex;
     }
+    .tab-btn {
+      background: transparent; border: none;
+      border-bottom: 3px solid transparent;
+      color: rgba(255,255,255,0.55);
+      font-size: 13px; font-weight: bold; font-family: inherit;
+      padding: 11px 22px; cursor: pointer;
+      transition: color .15s, border-color .15s; white-space: nowrap;
+    }
+    .tab-btn:hover { color: rgba(255,255,255,0.85); }
+    .tab-btn.active { color: #fff; border-bottom-color: #e67e22; }
+
+    /* ── コンテンツ ── */
+    .content { max-width: 960px; margin: 0 auto; padding: 24px 20px; }
 
     /* ── カード ── */
     .card {
-      background: #fff;
-      border: 1px solid #ddd;
-      border-radius: 8px;
-      padding: 24px;
-      margin-bottom: 20px;
+      background: #fff; border: 1px solid #ddd; border-radius: 8px;
+      padding: 24px; margin-bottom: 20px;
     }
     .card-title {
-      font-size: 14px;
-      font-weight: bold;
-      color: #2c3e50;
-      border-left: 4px solid #3498db;
-      padding-left: 10px;
-      margin-bottom: 20px;
+      font-size: 14px; font-weight: bold; color: #2c3e50;
+      border-left: 4px solid #3498db; padding-left: 10px; margin-bottom: 20px;
     }
 
     /* ── フォーム ── */
-    .form-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 16px;
-    }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
     .form-grid .full { grid-column: 1 / -1; }
 
     .form-group { display: flex; flex-direction: column; gap: 5px; }
     .form-group label { font-size: 12px; color: #555; font-weight: bold; }
     .form-group label .req { color: #e74c3c; margin-left: 2px; }
 
-    input[type="text"],
-    input[type="number"],
-    input[type="date"],
-    select,
-    textarea {
-      border: 1px solid #ccc;
-      border-radius: 5px;
-      padding: 8px 10px;
-      font-size: 14px;
-      font-family: inherit;
-      width: 100%;
-      transition: border-color .15s;
+    input[type="text"], input[type="number"], input[type="date"], select, textarea {
+      border: 1px solid #ccc; border-radius: 5px; padding: 8px 10px;
+      font-size: 14px; font-family: inherit; width: 100%; transition: border-color .15s;
     }
     input:focus, select:focus, textarea:focus {
-      outline: none;
-      border-color: #3498db;
+      outline: none; border-color: #3498db;
       box-shadow: 0 0 0 2px rgba(52,152,219,.15);
     }
     input[readonly] { background: #f8f9fa; color: #666; }
     textarea { resize: vertical; min-height: 60px; }
 
+    /* ラジオボタン */
+    .radio-group { display: flex; gap: 16px; align-items: center; padding-top: 6px; }
+    .radio-group label {
+      display: flex; align-items: center; gap: 5px;
+      font-size: 14px; font-weight: normal; color: #333; cursor: pointer;
+    }
+    .radio-group input[type="radio"] { width: auto; }
+
     /* ── オートコンプリート ── */
     .autocomplete-wrap { position: relative; }
     .autocomplete-list {
-      position: absolute;
-      top: 100%; left: 0; right: 0;
-      background: #fff;
-      border: 1px solid #ccc;
-      border-top: none;
-      border-radius: 0 0 5px 5px;
-      max-height: 220px;
-      overflow-y: auto;
-      z-index: 100;
-      box-shadow: 0 4px 12px rgba(0,0,0,.1);
+      position: absolute; top: 100%; left: 0; right: 0;
+      background: #fff; border: 1px solid #ccc; border-top: none;
+      border-radius: 0 0 5px 5px; max-height: 220px; overflow-y: auto;
+      z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,.1);
     }
     .autocomplete-item {
-      padding: 8px 12px;
-      cursor: pointer;
-      display: flex;
-      align-items: baseline;
-      gap: 8px;
+      padding: 8px 12px; cursor: pointer;
+      display: flex; align-items: baseline; gap: 8px;
     }
-    .autocomplete-item:hover,
-    .autocomplete-item.active { background: #eaf4fc; }
+    .autocomplete-item:hover, .autocomplete-item.active { background: #eaf4fc; }
     .ac-name { font-size: 14px; }
     .ac-code { font-size: 11px; color: #999; }
+    .ac-sub   { font-size: 11px; color: #888; }
     .ac-price { font-size: 12px; color: #27ae60; margin-left: auto; flex-shrink: 0; }
+    .ac-stock { font-size: 11px; color: #2980b9; flex-shrink: 0; }
 
-    /* ── 金額表示 ── */
-    .amount-display {
-      background: #eaf4fc;
-      border: 1px solid #aed6f1;
-      border-radius: 5px;
-      padding: 10px 14px;
-      font-size: 20px;
-      font-weight: bold;
-      color: #2980b9;
-      text-align: right;
+    /* 在庫数インライン表示 */
+    .stock-info {
+      display: inline-flex; align-items: center; gap: 6px;
+      margin-top: 5px; padding: 4px 10px;
+      background: #eaf4fc; border: 1px solid #aed6f1; border-radius: 4px;
+      font-size: 12px; color: #2471a3;
     }
+    .stock-info .stock-val { font-weight: bold; font-size: 14px; }
+    .stock-warn { background: #fef9e7; border-color: #f9ca24; color: #b7950b; }
+
+    /* ── 表示ボックス ── */
+    .amount-display {
+      background: #eaf4fc; border: 1px solid #aed6f1; border-radius: 5px;
+      padding: 10px 14px; font-size: 20px; font-weight: bold;
+      color: #2980b9; text-align: right;
+    }
+    .ref-display {
+      background: #f8f9fa; border: 1px solid #ddd; border-radius: 5px;
+      padding: 8px 12px; font-size: 14px; color: #555; text-align: right;
+    }
+    .ref-label { font-size: 11px; color: #999; margin-bottom: 2px; }
+
+    /* 区切り線 */
+    .section-divider { grid-column: 1 / -1; border: none; border-top: 1px solid #eee; margin: 4px 0; }
 
     /* ── ボタン ── */
     .btn {
-      border: none;
-      border-radius: 5px;
-      padding: 10px 28px;
-      font-size: 14px;
-      font-family: inherit;
-      cursor: pointer;
-      font-weight: bold;
-      transition: background .15s;
+      border: none; border-radius: 5px; padding: 10px 28px;
+      font-size: 14px; font-family: inherit; cursor: pointer;
+      font-weight: bold; transition: background .15s;
     }
     .btn-primary { background: #3498db; color: #fff; }
     .btn-primary:hover { background: #2980b9; }
     .btn-primary:disabled { background: #aaa; cursor: not-allowed; }
     .btn-secondary { background: #ecf0f1; color: #555; }
     .btn-secondary:hover { background: #dfe6e9; }
+    .btn-orange { background: #e67e22; color: #fff; }
+    .btn-orange:hover { background: #d35400; }
+    .btn-orange:disabled { background: #aaa; cursor: not-allowed; }
 
     /* ── トースト ── */
     .toast {
-      position: fixed;
-      bottom: 24px; left: 50%;
-      transform: translateX(-50%);
-      padding: 12px 24px;
-      border-radius: 6px;
-      font-size: 14px;
-      font-weight: bold;
-      color: #fff;
-      z-index: 9999;
-      box-shadow: 0 4px 16px rgba(0,0,0,.2);
-      pointer-events: none;
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      padding: 12px 24px; border-radius: 6px; font-size: 14px; font-weight: bold;
+      color: #fff; z-index: 9999; box-shadow: 0 4px 16px rgba(0,0,0,.2); pointer-events: none;
     }
     .toast-ok  { background: #27ae60; }
     .toast-err { background: #e74c3c; }
 
     /* ── 履歴テーブル ── */
-    .history-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 13px;
-    }
+    .history-table { width: 100%; border-collapse: collapse; font-size: 13px; }
     .history-table th {
-      background: #2c3e50;
-      color: #fff;
-      padding: 8px 12px;
-      text-align: left;
-      font-size: 12px;
+      background: #2c3e50; color: #fff; padding: 8px 12px;
+      text-align: left; font-size: 12px;
     }
-    .history-table td {
-      padding: 7px 12px;
-      border-bottom: 1px solid #f0f0f0;
-    }
+    .history-table td { padding: 7px 12px; border-bottom: 1px solid #f0f0f0; }
     .history-table tbody tr:hover td { background: #f8f9fa; }
     .history-table .num { text-align: right; font-variant-numeric: tabular-nums; }
     .no-data { padding: 16px; text-align: center; color: #aaa; }
+
+    .badge { display: inline-block; padding: 2px 7px; border-radius: 3px; font-size: 11px; font-weight: bold; }
+    .badge-done    { background: #d5f5e3; color: #1e8449; }
+    .badge-pending { background: #fef9e7; color: #b7950b; }
 
     @media (max-width: 600px) {
       .form-grid { grid-template-columns: 1fr; }
@@ -198,122 +176,54 @@
 
     /* ── PINスクリーン ── */
     .pin-overlay {
-      position: fixed;
-      inset: 0;
-      background: #0d0f14;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      z-index: 10000;
+      position: fixed; inset: 0; background: #0d0f14;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10000;
     }
     .pin-title {
-      font-size: 22px;
-      font-weight: bold;
-      color: #4fc3f7;
-      margin-bottom: 28px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
+      font-size: 22px; font-weight: bold; color: #4fc3f7;
+      margin-bottom: 28px; display: flex; align-items: center; gap: 10px;
     }
     .pin-title svg { width: 24px; height: 24px; fill: #4fc3f7; }
-    .pin-card {
-      background: #1a1d27;
-      border-radius: 16px;
-      padding: 28px 32px 24px;
-      width: 280px;
-    }
-    .pin-hint {
-      font-size: 13px;
-      color: #888;
-      text-align: center;
-      margin-bottom: 20px;
-    }
-    .pin-dots {
-      display: flex;
-      justify-content: center;
-      gap: 18px;
-      margin-bottom: 28px;
-    }
+    .pin-card { background: #1a1d27; border-radius: 16px; padding: 28px 32px 24px; width: 280px; }
+    .pin-hint { font-size: 13px; color: #888; text-align: center; margin-bottom: 20px; }
+    .pin-dots { display: flex; justify-content: center; gap: 18px; margin-bottom: 28px; }
     .pin-dot {
-      width: 14px; height: 14px;
-      border-radius: 50%;
-      background: #2e3247;
-      border: 2px solid #3a3f5a;
+      width: 14px; height: 14px; border-radius: 50%;
+      background: #2e3247; border: 2px solid #3a3f5a;
       transition: background .15s, border-color .15s;
     }
-    .pin-dot.filled {
-      background: #4fc3f7;
-      border-color: #4fc3f7;
-    }
-    .pin-dot.error {
-      background: #e74c3c;
-      border-color: #e74c3c;
-    }
-    .pin-pad {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 10px;
-    }
+    .pin-dot.filled { background: #4fc3f7; border-color: #4fc3f7; }
+    .pin-dot.error  { background: #e74c3c; border-color: #e74c3c; }
+    .pin-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
     .pin-btn {
-      background: #252838;
-      border: none;
-      border-radius: 10px;
-      color: #fff;
-      font-size: 18px;
-      font-weight: bold;
-      font-family: inherit;
-      padding: 14px 0;
-      cursor: pointer;
-      transition: background .12s;
-      user-select: none;
+      background: #252838; border: none; border-radius: 10px;
+      color: #fff; font-size: 18px; font-weight: bold; font-family: inherit;
+      padding: 14px 0; cursor: pointer; transition: background .12s; user-select: none;
     }
     .pin-btn:active { background: #4fc3f7; color: #0d0f14; }
-    .pin-btn.empty { background: transparent; cursor: default; }
+    .pin-btn.empty  { background: transparent; cursor: default; }
     .pin-btn.back-btn { font-size: 20px; }
+
     /* ── 在庫超過アラートモーダル ── */
     .stock-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,.55);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 9998;
+      position: fixed; inset: 0; background: rgba(0,0,0,.55);
+      display: flex; align-items: center; justify-content: center; z-index: 9998;
     }
     .stock-modal {
-      background: #fff;
-      border-radius: 10px;
-      padding: 32px 28px 24px;
-      max-width: 380px;
-      width: 90%;
-      box-shadow: 0 8px 32px rgba(0,0,0,.25);
-      text-align: center;
+      background: #fff; border-radius: 10px; padding: 32px 28px 24px;
+      max-width: 380px; width: 90%; box-shadow: 0 8px 32px rgba(0,0,0,.25); text-align: center;
     }
-    .stock-modal-icon {
-      font-size: 44px;
-      margin-bottom: 12px;
-    }
-    .stock-modal-title {
-      font-size: 16px;
-      font-weight: bold;
-      color: #c0392b;
-      margin-bottom: 14px;
-    }
-    .stock-modal-body {
-      font-size: 14px;
-      color: #444;
-      line-height: 1.7;
-      margin-bottom: 24px;
-    }
+    .stock-modal-icon  { font-size: 44px; margin-bottom: 12px; }
+    .stock-modal-title { font-size: 16px; font-weight: bold; color: #c0392b; margin-bottom: 14px; }
+    .stock-modal-body  { font-size: 14px; color: #444; line-height: 1.7; margin-bottom: 24px; }
     .stock-modal-body strong { color: #c0392b; }
 
     @keyframes pinShake {
       0%,100% { transform: translateX(0); }
-      20%      { transform: translateX(-8px); }
-      40%      { transform: translateX(8px); }
-      60%      { transform: translateX(-6px); }
-      80%      { transform: translateX(6px); }
+      20%     { transform: translateX(-8px); }
+      40%     { transform: translateX(8px); }
+      60%     { transform: translateX(-6px); }
+      80%     { transform: translateX(6px); }
     }
     .pin-card.shake { animation: pinShake .35s ease; }
   </style>
@@ -326,9 +236,9 @@
     <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
       <path d="M18 8h-1V6A5 5 0 0 0 7 6v2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10a2 2 0 0 0-2-2zm-6 9a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm3.1-9H8.9V6a3.1 3.1 0 0 1 6.2 0v2z"/>
     </svg>
-    生産工場DX
+    千秋工場・赤見工場 ｜ 材料購入 ＆ 在庫利用
   </div>
-  <div class="pin-card" :class="{ shake: pinShaking }" :id="'pin-card'">
+  <div class="pin-card" :class="{ shake: pinShaking }">
     <div class="pin-hint">4桁のパスワードを入力してください</div>
     <div class="pin-dots">
       <template x-for="i in 4" :key="i">
@@ -369,183 +279,493 @@
 <div class="header">
   <div class="header-inner">
     <div class="header-icon">工</div>
-    <h1>生産工場DX ｜ 使用材料・消耗品 入力フォーム</h1>
+    <h1>千秋工場・赤見工場 ｜ 材料購入 ＆ 在庫利用 入力フォーム</h1>
+  </div>
+</div>
+
+<!-- タブナビ -->
+<div class="tab-nav">
+  <div class="tab-nav-inner">
+    <button class="tab-btn" :class="{ active: activeTab === 'purchase' }" @click="switchTab('purchase')">
+      材料・備品購入
+    </button>
+    <button class="tab-btn" :class="{ active: activeTab === 'usage' }" @click="switchTab('usage')">
+      在庫使用
+    </button>
   </div>
 </div>
 
 <div class="content">
 
-  <!-- 入力フォーム -->
-  <div class="card">
-    <div class="card-title">使用材料・消耗品の入力</div>
+  <!-- ══════════════════════════════════════
+       材料・備品購入タブ (App 794)
+  ══════════════════════════════════════ -->
+  <div x-show="activeTab === 'purchase'" x-cloak>
 
-    <div class="form-grid">
+    <div class="card">
+      <div class="card-title">材料・備品購入の入力</div>
 
-      <!-- 対象年月 -->
-      <div class="form-group">
-        <label>対象年月<span class="req">*</span></label>
+      <div class="form-grid">
+
+        <!-- 日付 -->
+        <div class="form-group">
+          <label>日付<span class="req">*</span></label>
+          <input type="date" x-model="pform.日付">
+        </div>
+
+        <!-- 班別 -->
+        <div class="form-group">
+          <label>班別<span class="req">*</span></label>
+          <select x-model="pform.班">
+            <option value="">-- 選択してください --</option>
+            <option>出力班</option>
+            <option>洗浄班</option>
+            <option>顔班</option>
+            <option>組付け班</option>
+            <option>塗装班</option>
+            <option>梱包班</option>
+            <option>磨き班</option>
+            <option>サンプル</option>
+            <option>総務</option>
+            <option>管理</option>
+          </select>
+        </div>
+
+        <!-- 出金区分 -->
+        <div class="form-group">
+          <label>出金区分<span class="req">*</span></label>
+          <select x-model="pform.出金区分">
+            <option value="">-- 選択してください --</option>
+            <option>樹脂</option>
+            <option>変動費（製造用）</option>
+            <option>製造用消耗品</option>
+            <option>製造用備品</option>
+            <option>外注費</option>
+            <option>人材派遣費</option>
+            <option>人件費</option>
+            <option>固定費</option>
+            <option>水道光熱費</option>
+            <option>設備投資</option>
+            <option>福利厚生</option>
+            <option>開発・実験</option>
+            <option>事務用品</option>
+            <option>輸送費・送料</option>
+            <option>その他</option>
+          </select>
+        </div>
+
+        <!-- 購入先 -->
+        <div class="form-group">
+          <label>購入先（支払い先）</label>
+          <input type="text" x-model="pform.購入先" placeholder="例：〇〇商事">
+        </div>
+
+        <!-- 品目名（オートコンプリート） -->
+        <div class="form-group full autocomplete-wrap">
+          <label>品目名<span class="req">*</span>
+            <span style="font-weight:normal;color:#aaa;font-size:11px;margin-left:6px;">（過去入力から検索・選択で各項目が自動入力・編集可）</span>
+          </label>
+          <input
+            type="text"
+            x-model="pform.品目名"
+            @input="pAcInput()"
+            @keydown.arrow-down.prevent="pAcMove(1)"
+            @keydown.arrow-up.prevent="pAcMove(-1)"
+            @keydown.enter.prevent="pAcSelect(pacIndex)"
+            @keydown.escape="pAcClose()"
+            @focus="pAcInput()"
+            autocomplete="off"
+            placeholder="品目名を入力（過去の入力から候補を表示）">
+          <div class="autocomplete-list" x-show="pacItems.length > 0" @click.outside="pAcClose()">
+            <template x-for="(item, i) in pacItems" :key="item.品目名">
+              <div
+                class="autocomplete-item"
+                :class="{ active: i === pacIndex }"
+                @mousedown.prevent="pAcSelect(i)">
+                <span class="ac-name" x-text="item.品目名"></span>
+                <span class="ac-code" x-text="item.在庫品目コード"></span>
+                <span class="ac-sub" x-text="item.出金区分"></span>
+                <span class="ac-price" x-text="item.購入単価 ? '¥' + Number(item.購入単価).toLocaleString() : ''"></span>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- 在庫品目コード -->
+        <div class="form-group">
+          <label>在庫品目コード</label>
+          <input type="text" x-model="pform.在庫品目コード" placeholder="在庫連携用コード（任意）">
+        </div>
+
+        <!-- 課税対象 -->
+        <div class="form-group">
+          <label>課税対象<span class="req">*</span></label>
+          <div class="radio-group">
+            <label><input type="radio" x-model="pform.課税対象" value="国内" @change="pCalc()"> 国内</label>
+            <label><input type="radio" x-model="pform.課税対象" value="海外｜非課税" @change="pCalc()"> 海外｜非課税</label>
+          </div>
+        </div>
+
+        <hr class="section-divider">
+
+        <!-- 購入数量 -->
+        <div class="form-group">
+          <label>注文数（購入数量）<span class="req">*</span></label>
+          <input type="number" x-model.number="pform.購入数量" min="0" step="any" @input="pCalc()" placeholder="0">
+        </div>
+
+        <!-- 何個入り -->
+        <div class="form-group">
+          <label>入数（何個入り）</label>
+          <input type="number" x-model.number="pform.何個入り" min="1" step="1" @input="pCalc()" placeholder="1">
+        </div>
+
+        <!-- 単位 -->
+        <div class="form-group">
+          <label>単位</label>
+          <select x-model="pform.単位">
+            <option value="式">式</option>
+            <option value="個">個</option>
+            <option value="L">L</option>
+            <option value="ml">ml</option>
+            <option value="kg">kg</option>
+            <option value="g">g</option>
+            <option value="枚">枚</option>
+            <option value="名">名</option>
+          </select>
+        </div>
+
+        <!-- 購入数（参考） -->
+        <div class="form-group">
+          <div class="ref-label">購入数（個）＝ 注文数 × 入数</div>
+          <div class="ref-display" x-text="pCV.購入数.toLocaleString() + ' 個'"></div>
+        </div>
+
+        <hr class="section-divider">
+
+        <!-- 購入単価 -->
+        <div class="form-group">
+          <label>単価（円/パック）<span class="req">*</span></label>
+          <input type="number" x-model.number="pform.購入単価" min="0" step="1" @input="pCalc()" placeholder="0">
+        </div>
+
+        <!-- 1個単価・税抜（参考） -->
+        <div class="form-group">
+          <div class="ref-label">1個単価（税抜）＝ 単価 ÷ 入数</div>
+          <div class="ref-display"
+            x-text="'¥ ' + pCV.単価税抜.toLocaleString(undefined, {minimumFractionDigits:1, maximumFractionDigits:1})">
+          </div>
+        </div>
+
+        <!-- 海外：ドル単価 -->
+        <div class="form-group" x-show="pform.課税対象 === '海外｜非課税'">
+          <label>ドル単価（＄）</label>
+          <input type="number" x-model.number="pform.ドル単価" min="0" step="0.01" @input="pCalc()" placeholder="0.00">
+        </div>
+
+        <!-- 海外：ドル円レート -->
+        <div class="form-group" x-show="pform.課税対象 === '海外｜非課税'">
+          <label>ドル円（為替レート）</label>
+          <input type="number" x-model.number="pform.ドル円" min="1" step="0.01" @input="pCalc()" placeholder="160">
+        </div>
+
+        <!-- 海外：＄円変換（参考） -->
+        <div class="form-group" x-show="pform.課税対象 === '海外｜非課税'">
+          <div class="ref-label">＄円変換＝ ドル円 × ドル単価</div>
+          <div class="ref-display" x-text="'¥ ' + pCV.ドル円変換.toLocaleString()"></div>
+        </div>
+
+        <!-- 国内：1個単価・税込（参考） -->
+        <div class="form-group" x-show="pform.課税対象 === '国内'">
+          <div class="ref-label">1個単価（税込）＝ 単価 × 1.1 ÷ 入数</div>
+          <div class="ref-display"
+            x-text="'¥ ' + pCV.単価税込.toLocaleString(undefined, {minimumFractionDigits:1, maximumFractionDigits:1})">
+          </div>
+        </div>
+
+        <hr class="section-divider">
+
+        <!-- 税抜き額（参考） -->
+        <div class="form-group">
+          <div class="ref-label">税抜き額（円）＝ 注文数 × 単価</div>
+          <div class="ref-display" x-text="'¥ ' + pCV.税抜額.toLocaleString()"></div>
+        </div>
+
+        <!-- 税込み額（メイン） -->
+        <div class="form-group">
+          <label>税込み額（円）</label>
+          <div class="amount-display" x-text="'¥ ' + pCV.税込額.toLocaleString()"></div>
+        </div>
+
+        <!-- 備考 -->
+        <div class="form-group full">
+          <label>備考</label>
+          <textarea x-model="pform.備考" placeholder="任意：補足事項があれば入力"></textarea>
+        </div>
+
+      </div><!-- /form-grid -->
+
+      <div style="display:flex;justify-content:flex-end;gap:12px;margin-top:20px;">
+        <button class="btn btn-secondary" @click="pResetForm()">リセット</button>
+        <button class="btn btn-orange" :disabled="pSubmitting || !pIsValid()" @click="pSubmit()">
+          <span x-show="!pSubmitting">登録する</span>
+          <span x-show="pSubmitting">送信中...</span>
+        </button>
+      </div>
+    </div><!-- /card -->
+
+    <!-- 購入履歴 -->
+    <div class="card">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;">
+        <span>購入履歴
+          <span style="font-weight:normal;font-size:12px;color:#888;margin-left:8px;"
+            x-text="pform.year + '年' + pform.month + '月'"></span>
+        </span>
         <div style="display:flex;gap:8px;align-items:center;">
-          <select x-model="form.year" style="width:auto;">
+          <select x-model="pform.year" style="width:auto;font-size:12px;padding:4px 6px;" @change="pLoadHistory()">
             {% for y in range(current_year - 2, current_year + 2) %}
             <option value="{{ y }}" {% if y == current_year %}selected{% endif %}>{{ y }}年</option>
             {% endfor %}
           </select>
-          <select x-model="form.month" style="width:auto;">
+          <select x-model="pform.month" style="width:auto;font-size:12px;padding:4px 6px;" @change="pLoadHistory()">
             {% for m in range(1, 13) %}
             <option value="{{ m }}" {% if m == current_month %}selected{% endif %}>{{ m }}月</option>
             {% endfor %}
           </select>
+          <button class="btn btn-secondary" style="font-size:12px;padding:5px 14px;" @click="pLoadHistory()">更新</button>
         </div>
       </div>
 
-      <!-- 入力日 -->
-      <div class="form-group">
-        <label>入力日（使用日）<span class="req">*</span></label>
-        <input type="date" x-model="form.入力日">
-      </div>
-
-      <!-- 班別 -->
-      <div class="form-group">
-        <label>班別<span class="req">*</span></label>
-        <select x-model="form.班別">
-          <option value="">-- 選択してください --</option>
-          <option>出力班</option>
-          <option>梱包班</option>
-          <option>組付け班</option>
-          <option>洗浄班</option>
-          <option>塗装班</option>
-          <option>磨き班</option>
-          <option>顔班</option>
-          <option>総務</option>
-          <option>サンプル班</option>
-        </select>
-      </div>
-
-      <!-- 品目名（オートコンプリート） -->
-      <div class="form-group full autocomplete-wrap">
-        <label>品目名<span class="req">*</span>
-          <span style="font-weight:normal;color:#aaa;font-size:11px;margin-left:6px;">（品目名または品目コードで検索）</span>
-        </label>
-        <input
-          type="text"
-          x-model="form.品目名"
-          @input="onItemInput()"
-          @keydown.arrow-down.prevent="acMove(1)"
-          @keydown.arrow-up.prevent="acMove(-1)"
-          @keydown.enter.prevent="acSelect(acIndex)"
-          @keydown.escape="acClose()"
-          @focus="onItemInput()"
-          autocomplete="off"
-          placeholder="例：XL白樹脂 または MAT-001">
-        <!-- サジェストリスト -->
-        <div class="autocomplete-list" x-show="acItems.length > 0" @click.outside="acClose()">
-          <template x-for="(item, i) in acItems" :key="item.品目コード || item.品目名">
-            <div
-              class="autocomplete-item"
-              :class="{ active: i === acIndex }"
-              @mousedown.prevent="acSelect(i)">
-              <span class="ac-name" x-text="item.品目名"></span>
-              <span class="ac-code" x-text="item.品目コード"></span>
-              <span class="ac-price" x-text="'¥' + Number(item.単価).toLocaleString() + ' / ' + item.単位"></span>
-            </div>
-          </template>
-        </div>
-      </div>
-
-      <!-- 品目コード（読み取り専用） -->
-      <div class="form-group">
-        <label>品目コード</label>
-        <input type="text" x-model="form.品目コード" readonly placeholder="品目選択で自動入力">
-      </div>
-
-      <!-- 用途区分（読み取り専用） -->
-      <div class="form-group">
-        <label>用途区分</label>
-        <input type="text" x-model="form.用途区分" readonly placeholder="品目選択で自動入力">
-      </div>
-
-      <!-- 数量 -->
-      <div class="form-group">
-        <label>数量<span class="req">*</span>
-          <span style="font-weight:normal;color:#aaa;" x-show="form.単位" x-text="'（単位: ' + form.単位 + '）'"></span>
-        </label>
-        <input type="number" x-model.number="form.数量" min="0" step="any"
-          @input="calcAmount()" placeholder="0">
-      </div>
-
-      <!-- 単価 -->
-      <div class="form-group">
-        <label>単価（円）</label>
-        <input type="number" x-model.number="form.単価" min="0" step="1"
-          @input="calcAmount()" placeholder="品目選択で自動入力">
-      </div>
-
-      <!-- 金額 -->
-      <div class="form-group full">
-        <label>金額（円）</label>
-        <div class="amount-display" x-text="'¥ ' + form.金額.toLocaleString()"></div>
-      </div>
-
-      <!-- 備考 -->
-      <div class="form-group full">
-        <label>備考</label>
-        <textarea x-model="form.備考" placeholder="任意：補足事項があれば入力"></textarea>
-      </div>
-
-    </div><!-- /form-grid -->
-
-    <!-- ボタン -->
-    <div style="display:flex;justify-content:flex-end;gap:12px;margin-top:20px;">
-      <button class="btn btn-secondary" @click="resetForm()">リセット</button>
-      <button class="btn btn-primary" :disabled="submitting || !isValid()" @click="submit()">
-        <span x-show="!submitting">登録する</span>
-        <span x-show="submitting">送信中...</span>
-      </button>
-    </div>
-
-  </div><!-- /card -->
-
-  <!-- 入力履歴 -->
-  <div class="card">
-    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;">
-      <span>入力履歴
-        <span style="font-weight:normal;font-size:12px;color:#888;margin-left:8px;"
-          x-text="form.year + '年' + form.month + '月'"></span>
-      </span>
-      <button class="btn btn-secondary" style="font-size:12px;padding:5px 14px;" @click="loadHistory()">更新</button>
-    </div>
-
-    <template x-if="history.length === 0">
-      <div class="no-data">この月の入力データはありません</div>
-    </template>
-
-    <template x-if="history.length > 0">
-      <div style="overflow-x:auto;">
-        <table class="history-table">
-          <thead>
-            <tr>
-              <th>入力日</th>
-              <th>班別</th>
-              <th>品目名</th>
-              <th class="num">数量</th>
-              <th class="num">金額（円）</th>
-            </tr>
-          </thead>
-          <tbody>
-            <template x-for="r in history" :key="r.レコード番号">
+      <template x-if="pHistory.length === 0">
+        <div class="no-data">この月の購入データはありません</div>
+      </template>
+      <template x-if="pHistory.length > 0">
+        <div style="overflow-x:auto;">
+          <table class="history-table">
+            <thead>
               <tr>
-                <td x-text="r.入力日"></td>
-                <td x-text="r.班別"></td>
-                <td x-text="r.品目名"></td>
-                <td class="num" x-text="r.数量"></td>
-                <td class="num" x-text="'¥' + Number(r.金額).toLocaleString()"></td>
+                <th>日付</th><th>班</th><th>品目名</th><th>出金区分</th>
+                <th class="num">注文数</th><th class="num">入数</th>
+                <th class="num">税込み額</th><th>反映</th><th></th>
               </tr>
+            </thead>
+            <tbody>
+              <template x-for="r in pHistory" :key="r.レコード番号">
+                <tr>
+                  <td x-text="r.日付"></td>
+                  <td x-text="r.班"></td>
+                  <td x-text="r.品目名"></td>
+                  <td x-text="r.出金区分"></td>
+                  <td class="num" x-text="r.購入数量"></td>
+                  <td class="num" x-text="r.何個入り"></td>
+                  <td class="num" x-text="r.税込み額 ? '¥' + Number(r.税込み額).toLocaleString() : '-'"></td>
+                  <td>
+                    <span class="badge"
+                      :class="r.在庫反映状況 === '反映済' ? 'badge-done' : 'badge-pending'"
+                      x-text="r.在庫反映状況 || '未処理'">
+                    </span>
+                  </td>
+                  <td>
+                    <button class="btn btn-secondary" style="font-size:11px;padding:4px 10px;white-space:nowrap;"
+                      @click="pCopyFromHistory(r)">
+                      コピーして新規
+                    </button>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </template>
+    </div><!-- /card -->
+
+  </div><!-- /purchase tab -->
+
+
+  <!-- ══════════════════════════════════════
+       在庫使用タブ (App 792)
+  ══════════════════════════════════════ -->
+  <div x-show="activeTab === 'usage'" x-cloak>
+
+    <div class="card">
+      <div class="card-title">使用材料・消耗品の入力</div>
+
+      <div class="form-grid">
+
+        <!-- 対象年月 -->
+        <div class="form-group">
+          <label>対象年月<span class="req">*</span></label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <select x-model="form.year" style="width:auto;">
+              {% for y in range(current_year - 2, current_year + 2) %}
+              <option value="{{ y }}" {% if y == current_year %}selected{% endif %}>{{ y }}年</option>
+              {% endfor %}
+            </select>
+            <select x-model="form.month" style="width:auto;">
+              {% for m in range(1, 13) %}
+              <option value="{{ m }}" {% if m == current_month %}selected{% endif %}>{{ m }}月</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <!-- 入力日 -->
+        <div class="form-group">
+          <label>入力日（使用日）<span class="req">*</span></label>
+          <input type="date" x-model="form.入力日">
+        </div>
+
+        <!-- 班別 -->
+        <div class="form-group">
+          <label>班別<span class="req">*</span></label>
+          <select x-model="form.班別">
+            <option value="">-- 選択してください --</option>
+            <option>出力班</option>
+            <option>梱包班</option>
+            <option>組付け班</option>
+            <option>洗浄班</option>
+            <option>塗装班</option>
+            <option>磨き班</option>
+            <option>顔班</option>
+            <option>総務</option>
+            <option>サンプル班</option>
+          </select>
+        </div>
+
+        <!-- 品目名（オートコンプリート） -->
+        <div class="form-group full autocomplete-wrap">
+          <label>品目名<span class="req">*</span>
+            <span style="font-weight:normal;color:#aaa;font-size:11px;margin-left:6px;">（品目名または品目コードで検索）</span>
+          </label>
+          <input
+            type="text"
+            x-model="form.品目名"
+            @input="onItemInput()"
+            @keydown.arrow-down.prevent="acMove(1)"
+            @keydown.arrow-up.prevent="acMove(-1)"
+            @keydown.enter.prevent="acSelect(acIndex)"
+            @keydown.escape="acClose()"
+            @focus="onItemInput()"
+            autocomplete="off"
+            placeholder="例：XL白樹脂 または MAT-001">
+          <div class="autocomplete-list" x-show="acItems.length > 0" @click.outside="acClose()">
+            <template x-for="(item, i) in acItems" :key="item.品目コード || item.品目名">
+              <div
+                class="autocomplete-item"
+                :class="{ active: i === acIndex }"
+                @mousedown.prevent="acSelect(i)">
+                <span class="ac-name" x-text="item.品目名"></span>
+                <span class="ac-code" x-text="item.品目コード"></span>
+                <span class="ac-price" x-text="'¥' + Number(item.単価).toLocaleString() + ' / ' + item.単位"></span>
+                <span class="ac-stock" x-text="'在庫: ' + Number(item.現在庫数).toLocaleString() + ' ' + item.単位"></span>
+              </div>
             </template>
-          </tbody>
-        </table>
+          </div>
+          <!-- 選択後の在庫数インライン表示 -->
+          <div x-show="selectedStock !== null && form.品目名" style="margin-top:6px;">
+            <span class="stock-info" :class="{ 'stock-warn': selectedStock <= 0 }">
+              <span>現在庫数</span>
+              <span class="stock-val" x-text="Number(selectedStock).toLocaleString()"></span>
+              <span x-text="form.単位"></span>
+              <span x-show="selectedStock <= 0" style="color:#e74c3c;font-weight:bold;">⚠ 在庫なし</span>
+            </span>
+          </div>
+        </div>
+
+        <!-- 品目コード（読み取り専用） -->
+        <div class="form-group">
+          <label>品目コード</label>
+          <input type="text" x-model="form.品目コード" readonly placeholder="品目選択で自動入力">
+        </div>
+
+        <!-- 用途区分（読み取り専用） -->
+        <div class="form-group">
+          <label>用途区分</label>
+          <input type="text" x-model="form.用途区分" readonly placeholder="品目選択で自動入力">
+        </div>
+
+        <!-- 数量 -->
+        <div class="form-group">
+          <label>数量<span class="req">*</span>
+            <span style="font-weight:normal;color:#aaa;" x-show="form.単位" x-text="'（単位: ' + form.単位 + '）'"></span>
+          </label>
+          <input type="number" x-model.number="form.数量" min="0" step="any" @input="calcAmount()" placeholder="0">
+        </div>
+
+        <!-- 単価 -->
+        <div class="form-group">
+          <label>単価（円）</label>
+          <input type="number" x-model.number="form.単価" min="0" step="1" @input="calcAmount()" placeholder="品目選択で自動入力">
+        </div>
+
+        <!-- 金額 -->
+        <div class="form-group full">
+          <label>金額（円）</label>
+          <div class="amount-display" x-text="'¥ ' + form.金額.toLocaleString()"></div>
+        </div>
+
+        <!-- 備考 -->
+        <div class="form-group full">
+          <label>備考</label>
+          <textarea x-model="form.備考" placeholder="任意：補足事項があれば入力"></textarea>
+        </div>
+
+      </div><!-- /form-grid -->
+
+      <div style="display:flex;justify-content:flex-end;gap:12px;margin-top:20px;">
+        <button class="btn btn-secondary" @click="resetForm()">リセット</button>
+        <button class="btn btn-primary" :disabled="submitting || !isValid()" @click="submit()">
+          <span x-show="!submitting">登録する</span>
+          <span x-show="submitting">送信中...</span>
+        </button>
       </div>
-    </template>
-  </div>
+    </div><!-- /card -->
+
+    <!-- 入力履歴 -->
+    <div class="card">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;">
+        <span>入力履歴
+          <span style="font-weight:normal;font-size:12px;color:#888;margin-left:8px;"
+            x-text="form.year + '年' + form.month + '月'"></span>
+        </span>
+        <button class="btn btn-secondary" style="font-size:12px;padding:5px 14px;" @click="loadHistory()">更新</button>
+      </div>
+
+      <template x-if="history.length === 0">
+        <div class="no-data">この月の入力データはありません</div>
+      </template>
+      <template x-if="history.length > 0">
+        <div style="overflow-x:auto;">
+          <table class="history-table">
+            <thead>
+              <tr>
+                <th>入力日</th><th>班別</th><th>品目名</th>
+                <th class="num">数量</th><th class="num">金額（円）</th><th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="r in history" :key="r.レコード番号">
+                <tr>
+                  <td x-text="r.入力日"></td>
+                  <td x-text="r.班別"></td>
+                  <td x-text="r.品目名"></td>
+                  <td class="num" x-text="r.数量"></td>
+                  <td class="num" x-text="'¥' + Number(r.金額).toLocaleString()"></td>
+                  <td>
+                    <button class="btn btn-secondary" style="font-size:11px;padding:4px 10px;white-space:nowrap;"
+                      @click="copyFromUsageHistory(r)">
+                      コピーして新規
+                    </button>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </template>
+    </div><!-- /card -->
+
+  </div><!-- /usage tab -->
 
 </div><!-- /content -->
 
@@ -556,7 +776,17 @@
 <script>
 function app() {
   return {
-    // PINスクリーン
+
+    // ─── タブ ────────────────────────────────────────
+    activeTab: 'purchase',
+
+    switchTab(tab) {
+      this.activeTab = tab;
+      if (tab === 'purchase') this.pLoadHistory();
+      else                    this.loadHistory();
+    },
+
+    // ─── PIN ─────────────────────────────────────────
     pinScreen: true,
     pinDigits: '',
     pinError: false,
@@ -565,100 +795,283 @@ function app() {
     pinPress(d) {
       if (this.pinDigits.length >= 4) return;
       this.pinDigits += d;
-      if (this.pinDigits.length === 4) {
-        this.$nextTick(() => this.pinCheck());
-      }
+      if (this.pinDigits.length === 4) this.$nextTick(() => this.pinCheck());
     },
-
-    pinBack() {
-      this.pinDigits = this.pinDigits.slice(0, -1);
-      this.pinError = false;
-    },
-
+    pinBack() { this.pinDigits = this.pinDigits.slice(0, -1); this.pinError = false; },
     pinCheck() {
       if (this.pinDigits === '5342') {
         sessionStorage.setItem('pin_ok', '1');
         this.pinScreen = false;
       } else {
-        this.pinError = true;
-        this.pinShaking = true;
-        setTimeout(() => {
-          this.pinDigits = '';
-          this.pinError = false;
-          this.pinShaking = false;
-        }, 500);
+        this.pinError = true; this.pinShaking = true;
+        setTimeout(() => { this.pinDigits = ''; this.pinError = false; this.pinShaking = false; }, 500);
       }
     },
 
-    // フォーム状態
+    // ─── 共通 ─────────────────────────────────────────
+    toast: { show: false, msg: '', type: 'ok' },
+    showToast(msg, type) {
+      this.toast = { show: true, msg, type };
+      setTimeout(() => { this.toast.show = false; }, 3000);
+    },
+
+    init() {
+      if (sessionStorage.getItem('pin_ok') === '1') this.pinScreen = false;
+      const y0 = new Date().getFullYear();
+      this.years = [y0 - 2, y0 - 1, y0, y0 + 1];
+      this.resetForm();
+      this.pResetForm();
+      this.loadInventory();
+      this.loadPurchaseSuggestions();
+      this.pLoadHistory();
+    },
+
+
+    // ═══════════════════════════════════════════════════
+    // 材料・備品購入タブ (App 794)
+    // ═══════════════════════════════════════════════════
+
+    pform: {},
+    pSubmitting: false,
+    pSuggestions: [],
+    pacItems: [],
+    pacIndex: -1,
+    pHistory: [],
+    pCV: { 購入数: 0, 税抜額: 0, 税込額: 0, 単価税抜: 0, 単価税込: 0, ドル円変換: 0 },
+
+    pResetForm() {
+      const today = new Date().toISOString().slice(0, 10);
+      const now   = new Date();
+      this.pform = {
+        year: now.getFullYear(), month: now.getMonth() + 1,
+        日付: today, 班: '', 出金区分: '', 購入先: '',
+        品目名: '', 在庫品目コード: '', 課税対象: '国内',
+        購入数量: '', 何個入り: 1, 単位: '式',
+        購入単価: '', ドル単価: '', ドル円: 160, 備考: '',
+      };
+      this.pacItems = []; this.pacIndex = -1;
+      this.pCV = { 購入数: 0, 税抜額: 0, 税込額: 0, 単価税抜: 0, 単価税込: 0, ドル円変換: 0 };
+    },
+
+    async loadPurchaseSuggestions() {
+      try {
+        const res  = await fetch('/api/purchase-suggestions');
+        const data = await res.json();
+        this.pSuggestions = data.items || [];
+      } catch(e) { console.error('購入サジェスト取得エラー', e); }
+    },
+
+    async pLoadHistory() {
+      const y = this.pform.year  || new Date().getFullYear();
+      const m = this.pform.month || (new Date().getMonth() + 1);
+      const ym = String(y) + '/' + String(m).padStart(2, '0');
+      try {
+        const res  = await fetch('/api/purchase-history?ym=' + encodeURIComponent(ym));
+        const data = await res.json();
+        this.pHistory = data.records || [];
+      } catch(e) { console.error('購入履歴取得エラー', e); }
+    },
+
+    async pCopyFromHistory(r) {
+      try {
+        const res  = await fetch('/api/purchase/' + r.レコード番号);
+        if (!res.ok) throw new Error('取得失敗');
+        const data = await res.json();
+        const today = new Date().toISOString().slice(0, 10);
+        // 年月は現在のままにして日付のみ今日に
+        const savedYear  = this.pform.year;
+        const savedMonth = this.pform.month;
+        this.pform = {
+          ...this.pform,
+          year: savedYear, month: savedMonth,
+          日付:           today,
+          班:             data.班,
+          出金区分:       data.出金区分,
+          購入先:         data.購入先,
+          品目名:         data.品目名,
+          在庫品目コード: data.在庫品目コード,
+          課税対象:       data.課税対象,
+          購入数量:       Number(data.購入数量) || '',
+          何個入り:       Number(data.何個入り) || 1,
+          単位:           data.単位,
+          購入単価:       Number(data.購入単価) || '',
+          ドル単価:       Number(data.ドル単価) || '',
+          ドル円:         Number(data.ドル円) || 160,
+          備考:           '',
+        };
+        this.pCalc();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        this.showToast('「' + data.品目名 + '」の内容をコピーしました', 'ok');
+      } catch(e) {
+        this.showToast('コピー失敗: ' + e.message, 'err');
+      }
+    },
+
+    pAcInput() {
+      const q = (this.pform.品目名 || '').trim().toLowerCase();
+      if (!q) { this.pacItems = []; return; }
+      this.pacItems = this.pSuggestions.filter(item =>
+        item.品目名.toLowerCase().includes(q) ||
+        (item.在庫品目コード && item.在庫品目コード.toLowerCase().includes(q))
+      ).slice(0, 10);
+      this.pacIndex = -1;
+    },
+    pAcMove(dir) {
+      if (!this.pacItems.length) return;
+      this.pacIndex = (this.pacIndex + dir + this.pacItems.length) % this.pacItems.length;
+    },
+    pAcSelect(i) {
+      const item = this.pacItems[i >= 0 ? i : 0];
+      if (!item) return;
+      this.pform.品目名          = item.品目名;
+      this.pform.在庫品目コード   = item.在庫品目コード;
+      this.pform.購入先           = item.購入先 || this.pform.購入先;
+      this.pform.出金区分         = item.出金区分 || this.pform.出金区分;
+      this.pform.購入単価         = Number(item.購入単価) || '';
+      this.pform.何個入り         = Number(item.何個入り) || 1;
+      this.pform.単位             = item.単位 || this.pform.単位;
+      this.pform.課税対象         = item.課税対象 || '国内';
+      if (item.課税対象 === '海外｜非課税') {
+        this.pform.ドル単価 = Number(item.ドル単価) || '';
+        this.pform.ドル円   = Number(item.ドル円)   || 160;
+      }
+      this.pCalc();
+      this.pacItems = []; this.pacIndex = -1;
+    },
+    pAcClose() { this.pacItems = []; this.pacIndex = -1; },
+
+    pCalc() {
+      const qty      = parseFloat(this.pform.購入数量) || 0;
+      const 入数     = parseFloat(this.pform.何個入り) || 1;
+      const 単価     = parseFloat(this.pform.購入単価) || 0;
+      const 海外     = this.pform.課税対象 === '海外｜非課税';
+      const ドル円   = parseFloat(this.pform.ドル円)   || 0;
+      const ドル単価 = parseFloat(this.pform.ドル単価) || 0;
+      this.pCV = {
+        購入数:     qty * 入数,
+        税抜額:     qty * 単価,
+        税込額:     海外 ? qty * 単価 : Math.round(qty * 単価 * 1.1),
+        単価税抜:   入数 > 0 ? 単価 / 入数 : 0,
+        単価税込:   入数 > 0 ? (単価 * 1.1) / 入数 : 0,
+        ドル円変換: Math.round(ドル円 * ドル単価),
+      };
+    },
+
+    pIsValid() {
+      return this.pform.班 && this.pform.出金区分 &&
+             (this.pform.品目名 || '').trim() &&
+             this.pform.日付 &&
+             (parseFloat(this.pform.購入数量) > 0) &&
+             (parseFloat(this.pform.購入単価) >= 0);
+    },
+
+    async pSubmit() {
+      if (!this.pIsValid() || this.pSubmitting) return;
+      this.pSubmitting = true;
+      const payload = {
+        日付: this.pform.日付, 班: this.pform.班, 出金区分: this.pform.出金区分,
+        品目名: this.pform.品目名.trim(), 在庫品目コード: this.pform.在庫品目コード,
+        購入先: this.pform.購入先, 課税対象: this.pform.課税対象,
+        購入数量: parseFloat(this.pform.購入数量) || 0,
+        何個入り: parseFloat(this.pform.何個入り) || 1,
+        単位: this.pform.単位,
+        購入単価: parseFloat(this.pform.購入単価) || 0,
+        ドル単価: parseFloat(this.pform.ドル単価) || 0,
+        ドル円:   parseFloat(this.pform.ドル円)   || 160,
+        備考: this.pform.備考,
+      };
+      try {
+        const res = await fetch('/api/purchase', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) { const err = await res.json(); throw new Error(err.detail || '送信失敗'); }
+        this.showToast('登録しました：' + payload.品目名, 'ok');
+        const savedY = this.pform.year; const savedM = this.pform.month;
+        this.pResetForm();
+        this.pform.year = savedY; this.pform.month = savedM;
+        this.pLoadHistory();
+        this.loadPurchaseSuggestions();
+      } catch(e) {
+        this.showToast('エラー: ' + e.message, 'err');
+      } finally { this.pSubmitting = false; }
+    },
+
+
+    // ═══════════════════════════════════════════════════
+    // 在庫使用タブ (App 792)
+    // ═══════════════════════════════════════════════════
+
     form: {},
     submitting: false,
     years: [],
-    inventory: [],   // App791 全件キャッシュ
-    acItems: [],     // サジェスト候補
+    inventory: [],
+    acItems: [],
     acIndex: -1,
     history: [],
-    toast: { show: false, msg: '', type: 'ok' },
-    selectedStock: null,   // 選択中品目の現在庫数
+    selectedStock: null,
     stockAlert: { show: false, qty: 0, stock: 0, unit: '' },
-
-    init() {
-      if (sessionStorage.getItem('pin_ok') === '1') {
-        this.pinScreen = false;
-      }
-      const today = new Date();
-      const y0 = today.getFullYear();
-      this.years = [y0 - 2, y0 - 1, y0, y0 + 1];
-      this.resetForm();
-      this.loadInventory();
-      this.loadHistory();
-    },
 
     resetForm() {
       const today = new Date().toISOString().slice(0, 10);
-      const now   = new Date();
       this.form = {
-        year:    {{ current_year }},
-        month:   {{ current_month }},
-        入力日:  today,
-        班別:    '',
-        品目コード: '',
-        品目名:  '',
-        用途区分: '',
-        単位:    '',
-        数量:    '',
-        単価:    '',
-        金額:    0,
-        備考:    '',
+        year: {{ current_year }}, month: {{ current_month }},
+        入力日: today, 班別: '', 品目コード: '', 品目名: '',
+        用途区分: '', 単位: '', 数量: '', 単価: '', 金額: 0, 備考: '',
       };
-      this.acItems = [];
-      this.acIndex = -1;
-      this.selectedStock = null;
+      this.acItems = []; this.acIndex = -1; this.selectedStock = null;
     },
 
     async loadInventory() {
       try {
-        const res = await fetch('/api/inventory');
+        const res  = await fetch('/api/inventory');
         const data = await res.json();
         this.inventory = data.items || [];
-      } catch (e) {
-        console.error('在庫取得エラー', e);
-      }
+      } catch(e) { console.error('在庫取得エラー', e); }
     },
 
     async loadHistory() {
-      const ym = String(this.form.year) + '/' +
-        String(this.form.month).padStart(2, '0');
+      const ym = String(this.form.year) + '/' + String(this.form.month).padStart(2, '0');
       try {
-        const res = await fetch('/api/history?ym=' + encodeURIComponent(ym));
+        const res  = await fetch('/api/history?ym=' + encodeURIComponent(ym));
         const data = await res.json();
         this.history = data.records || [];
-      } catch (e) {
-        console.error('履歴取得エラー', e);
+      } catch(e) { console.error('履歴取得エラー', e); }
+    },
+
+    async copyFromUsageHistory(r) {
+      try {
+        const res = await fetch('/api/usage/' + r.レコード番号);
+        if (!res.ok) throw new Error('取得失敗');
+        const data = await res.json();
+        const today = new Date().toISOString().slice(0, 10);
+        this.form.入力日   = today;
+        this.form.班別     = data.班別;
+        this.form.品目コード = data.品目コード;
+        this.form.品目名   = data.品目名;
+        this.form.用途区分 = data.用途区分;
+        this.form.数量     = Number(data.数量) || '';
+        this.form.単価     = Number(data.単価) || '';
+        this.form.備考     = '';
+        // 在庫数を inventory から取得して selectedStock を更新
+        const matched = this.inventory.find(item =>
+          (data.品目コード && item.品目コード === data.品目コード) ||
+          item.品目名 === data.品目名
+        );
+        if (matched) {
+          this.form.単位    = matched.単位;
+          this.selectedStock = parseFloat(matched.現在庫数) || 0;
+        } else {
+          this.selectedStock = null;
+        }
+        this.calcAmount();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        this.showToast('「' + data.品目名 + '」の内容をコピーしました', 'ok');
+      } catch(e) {
+        this.showToast('コピー失敗: ' + e.message, 'err');
       }
     },
 
-    // ── オートコンプリート ──
     onItemInput() {
       const q = (this.form.品目名 || '').trim().toLowerCase();
       if (!q) { this.acItems = []; return; }
@@ -668,12 +1081,10 @@ function app() {
       ).slice(0, 10);
       this.acIndex = -1;
     },
-
     acMove(dir) {
       if (!this.acItems.length) return;
       this.acIndex = (this.acIndex + dir + this.acItems.length) % this.acItems.length;
     },
-
     acSelect(i) {
       const item = this.acItems[i >= 0 ? i : 0];
       if (!item) return;
@@ -684,102 +1095,53 @@ function app() {
       this.form.単価      = Number(item.単価) || '';
       this.selectedStock  = parseFloat(item.現在庫数 ?? 0);
       this.calcAmount();
-      this.acItems = [];
-      this.acIndex = -1;
+      this.acItems = []; this.acIndex = -1;
     },
-
     acClose() { this.acItems = []; this.acIndex = -1; },
 
-    // ── 金額計算 ──
     calcAmount() {
-      const qty   = parseFloat(this.form.数量) || 0;
-      const price = parseFloat(this.form.単価) || 0;
-      this.form.金額 = Math.round(qty * price);
+      this.form.金額 = Math.round((parseFloat(this.form.数量)||0) * (parseFloat(this.form.単価)||0));
     },
 
-    // ── バリデーション ──
     isValid() {
-      return (
-        this.form.班別 &&
-        this.form.品目名.trim() &&
-        this.form.入力日 &&
-        (parseFloat(this.form.数量) > 0) &&
-        this.form.金額 > 0
-      );
+      return this.form.班別 && (this.form.品目名||'').trim() && this.form.入力日 &&
+             (parseFloat(this.form.数量) > 0) && this.form.金額 > 0;
     },
 
-    // ── 送信 ──
     async submit() {
       if (!this.isValid() || this.submitting) return;
-
-      // 在庫数チェック（在庫リストに存在する品目のみ）
       {
-        // サジェスト選択済みなら selectedStock、未選択なら品目名/コードで在庫を検索
-        let stockQty  = this.selectedStock;
-        let stockUnit = this.form.単位 || '';
+        let stockQty = this.selectedStock, stockUnit = this.form.単位 || '';
         if (stockQty === null) {
           const matched = this.inventory.find(item =>
             (this.form.品目コード && item.品目コード === this.form.品目コード) ||
             item.品目名 === this.form.品目名.trim()
           );
-          if (matched) {
-            stockQty  = parseFloat(matched.現在庫数) || 0;
-            stockUnit = matched.単位 || '';
-          }
+          if (matched) { stockQty = parseFloat(matched.現在庫数)||0; stockUnit = matched.単位||''; }
         }
         if (stockQty !== null) {
-          const qty = parseFloat(this.form.数量) || 0;
-          if (qty > stockQty) {
-            this.stockAlert = {
-              show:  true,
-              qty:   qty,
-              stock: stockQty,
-              unit:  stockUnit,
-            };
-            return;   // 送信しない
-          }
+          const qty = parseFloat(this.form.数量)||0;
+          if (qty > stockQty) { this.stockAlert = { show:true, qty, stock:stockQty, unit:stockUnit }; return; }
         }
       }
-
       this.submitting = true;
-      const ym = String(this.form.year) + '/' +
-        String(this.form.month).padStart(2, '0');
+      const ym = String(this.form.year) + '/' + String(this.form.month).padStart(2, '0');
       const payload = {
-        対象年月: ym,
-        入力日:   this.form.入力日,
-        班別:     this.form.班別,
-        品目コード: this.form.品目コード,
-        品目名:   this.form.品目名.trim(),
+        対象年月: ym, 入力日: this.form.入力日, 班別: this.form.班別,
+        品目コード: this.form.品目コード, 品目名: this.form.品目名.trim(),
         用途区分: this.form.用途区分,
-        数量:     parseFloat(this.form.数量) || 0,
-        単価:     parseFloat(this.form.単価) || 0,
-        金額:     this.form.金額,
-        備考:     this.form.備考,
+        数量: parseFloat(this.form.数量)||0, 単価: parseFloat(this.form.単価)||0,
+        金額: this.form.金額, 備考: this.form.備考,
       };
       try {
         const res = await fetch('/api/usage', {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify(payload),
+          method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload),
         });
-        if (!res.ok) {
-          const err = await res.json();
-          throw new Error(err.detail || '送信失敗');
-        }
+        if (!res.ok) { const err = await res.json(); throw new Error(err.detail||'送信失敗'); }
         this.showToast('登録しました：' + payload.品目名, 'ok');
-        this.resetForm();
-        this.loadHistory();
-        this.loadInventory();  // 在庫を再取得（送信後にチェックが古い値にならないよう）
-      } catch (e) {
-        this.showToast('エラー: ' + e.message, 'err');
-      } finally {
-        this.submitting = false;
-      }
-    },
-
-    showToast(msg, type) {
-      this.toast = { show: true, msg, type };
-      setTimeout(() => { this.toast.show = false; }, 3000);
+        this.resetForm(); this.loadHistory(); this.loadInventory();
+      } catch(e) { this.showToast('エラー: ' + e.message, 'err');
+      } finally { this.submitting = false; }
     },
   };
 }
