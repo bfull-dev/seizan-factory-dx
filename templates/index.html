@@ -632,6 +632,7 @@ function app() {
       };
       this.acItems = [];
       this.acIndex = -1;
+      this.selectedStock = null;
     },
 
     async loadInventory() {
@@ -767,6 +768,7 @@ function app() {
         this.showToast('登録しました：' + payload.品目名, 'ok');
         this.resetForm();
         this.loadHistory();
+        this.loadInventory();  // 在庫を再取得（送信後にチェックが古い値にならないよう）
       } catch (e) {
         this.showToast('エラー: ' + e.message, 'err');
       } finally {
