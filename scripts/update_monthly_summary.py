@@ -189,7 +189,8 @@ def aggregate_expenses(ym: str) -> dict:
 
     d_from, d_to = ym_to_date_range(ym)
     query = f'日付 >= "{d_from}" and 日付 <= "{d_to}"'
-    records = get_all_records(TOKEN_794, APP_EXPENSE, query, ["出金区分", "金額"])
+    # 税込み額フィールドを使用（国内=税抜×1.1、海外/非課税=税抜のまま）
+    records = get_all_records(TOKEN_794, APP_EXPENSE, query, ["出金区分", "税込み額"])
 
     # 出金区分 → App793フィールドコード マッピング
     # 樹脂・変動費（製造用）は在庫計上のみなので除外
@@ -213,7 +214,7 @@ def aggregate_expenses(ym: str) -> dict:
     skipped = 0
     for r in records:
         cat = r["出金区分"]["value"]
-        amt = int(float(r["金額"]["value"] or 0))
+        amt = int(float(r["税込み額"]["value"] or 0))
         if cat in 区分map:
             result[区分map[cat]] += amt
         else:
