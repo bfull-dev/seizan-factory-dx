@@ -154,7 +154,7 @@ async def get_recent_usage(ym: str, limit: int = 20) -> list[dict]:
         ("fields[3]", "品目名"),
         ("fields[4]", "数量"),
         ("fields[5]", "金額"),
-        ("query", f'入力種別 = "使用材料・消耗品" and 対象年月 = "{ym}" order by 作成日時 desc limit {limit}'),
+        ("query", f'入力種別 in ("使用材料・消耗品") and 対象年月 = "{ym}" order by 作成日時 desc limit {limit}'),
     ]
     async with httpx.AsyncClient(timeout=10) as client:
         resp = await client.get(url, params=params, headers=_get_headers(TOKEN_792))
@@ -186,7 +186,7 @@ async def sync_purchases_to_inventory() -> dict:
     url = f"{_base()}/records.json"
     params = [
         ("app", APP_PURCHASE),
-        ("query", '在庫品目コード != "" and (在庫反映状況 = "未処理" or 在庫反映状況 = "") order by 日付 asc limit 100'),
+        ("query", '在庫品目コード != "" and 在庫反映状況 not in ("反映済") order by 日付 asc limit 100'),
         ("fields[0]", "レコード番号"),
         ("fields[1]", "在庫品目コード"),
         ("fields[2]", "購入数"),

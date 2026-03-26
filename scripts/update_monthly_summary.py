@@ -148,7 +148,7 @@ def aggregate_usage(ym: str) -> dict:
 
     d_from, d_to = ym_to_date_range(ym)
     query = (
-        f'入力種別 = "使用材料・消耗品"'
+        f'入力種別 in ("使用材料・消耗品")'
         f' and 入力日 >= "{d_from}" and 入力日 <= "{d_to}"'
     )
     records = get_all_records(TOKEN_792, APP_USAGE, query, ["用途区分", "金額"])
