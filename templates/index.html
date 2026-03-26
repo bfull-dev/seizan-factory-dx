@@ -127,6 +127,21 @@
     }
     .ref-label { font-size: 11px; color: #999; margin-bottom: 2px; }
 
+    /* 3カラムブロック（海外フィールド用） */
+    .form-group-3col {
+      grid-column: 1 / -1;
+      display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px;
+    }
+
+    /* 購入数などインライン参考表示 */
+    .calc-row {
+      display: flex; align-items: center; gap: 12px;
+      background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 5px;
+      padding: 8px 14px;
+    }
+    .calc-label { font-size: 11px; color: #999; flex: 1; }
+    .calc-value { font-size: 16px; font-weight: bold; color: #555; white-space: nowrap; }
+
     /* 区切り線 */
     .section-divider { grid-column: 1 / -1; border: none; border-top: 1px solid #eee; margin: 4px 0; }
 
@@ -307,13 +322,13 @@
 
       <div class="form-grid">
 
-        <!-- 日付 -->
-        <div class="form-group">
+        <!-- ① 日付 (1カラム) -->
+        <div class="form-group full">
           <label>日付<span class="req">*</span></label>
-          <input type="date" x-model="pform.日付">
+          <input type="date" x-model="pform.日付" style="max-width:220px;">
         </div>
 
-        <!-- 班別 -->
+        <!-- ② 班別 | 出金区分 (2カラム) -->
         <div class="form-group">
           <label>班別<span class="req">*</span></label>
           <select x-model="pform.班">
@@ -330,8 +345,6 @@
             <option>管理</option>
           </select>
         </div>
-
-        <!-- 出金区分 -->
         <div class="form-group">
           <label>出金区分<span class="req">*</span></label>
           <select x-model="pform.出金区分">
@@ -354,13 +367,13 @@
           </select>
         </div>
 
-        <!-- 購入先 -->
-        <div class="form-group">
+        <!-- ③ 購入先 (1カラム) -->
+        <div class="form-group full">
           <label>購入先（支払い先）</label>
           <input type="text" x-model="pform.購入先" placeholder="例：〇〇商事">
         </div>
 
-        <!-- 品目名（オートコンプリート） -->
+        <!-- ④ 品目名（オートコンプリート）(1カラム) -->
         <div class="form-group full autocomplete-wrap">
           <label>品目名<span class="req">*</span>
             <span style="font-weight:normal;color:#aaa;font-size:11px;margin-left:6px;">（過去入力から検索・選択で各項目が自動入力・編集可）</span>
@@ -391,13 +404,11 @@
           </div>
         </div>
 
-        <!-- 在庫品目コード -->
+        <!-- ⑤ 在庫品目コード | 課税対象 (2カラム) -->
         <div class="form-group">
           <label>在庫品目コード</label>
           <input type="text" x-model="pform.在庫品目コード" placeholder="在庫連携用コード（任意）">
         </div>
-
-        <!-- 課税対象 -->
         <div class="form-group">
           <label>課税対象<span class="req">*</span></label>
           <div class="radio-group">
@@ -408,19 +419,21 @@
 
         <hr class="section-divider">
 
-        <!-- 購入数量 -->
+        <!-- ⑥ 注文数 | 単価（円/1ロット）(2カラム) -->
         <div class="form-group">
           <label>注文数（購入数量）<span class="req">*</span></label>
           <input type="number" x-model.number="pform.購入数量" min="0" step="any" @input="pCalc()" placeholder="0">
         </div>
-
-        <!-- 何個入り -->
         <div class="form-group">
-          <label>入数（何個入り）</label>
-          <input type="number" x-model.number="pform.何個入り" min="1" step="1" @input="pCalc()" placeholder="1">
+          <label>単価（円/1ロット）<span class="req">*</span></label>
+          <input type="number" x-model.number="pform.購入単価" min="0" step="1" @input="pCalc()" placeholder="0">
         </div>
 
-        <!-- 単位 -->
+        <!-- ⑦ 入り数 | 単位 (2カラム) -->
+        <div class="form-group">
+          <label>入り数（何個入り）</label>
+          <input type="number" x-model.number="pform.何個入り" min="1" step="1" @input="pCalc()" placeholder="1">
+        </div>
         <div class="form-group">
           <label>単位</label>
           <select x-model="pform.単位">
@@ -435,69 +448,53 @@
           </select>
         </div>
 
-        <!-- 購入数（参考） -->
-        <div class="form-group">
-          <div class="ref-label">購入数（個）＝ 注文数 × 入数</div>
-          <div class="ref-display" x-text="pCV.購入数.toLocaleString() + ' 個'"></div>
+        <!-- 海外：ドル単価 | ドル円 | ＄円変換 (3カラム、海外時のみ) -->
+        <div class="form-group-3col" x-show="pform.課税対象 === '海外｜非課税'">
+          <div class="form-group">
+            <label>ドル単価（＄）</label>
+            <input type="number" x-model.number="pform.ドル単価" min="0" step="0.01" @input="pCalc()" placeholder="0.00">
+          </div>
+          <div class="form-group">
+            <label>ドル円（為替レート）</label>
+            <input type="number" x-model.number="pform.ドル円" min="1" step="0.01" @input="pCalc()" placeholder="160">
+          </div>
+          <div class="form-group">
+            <div class="ref-label">＄円変換 ＝ ドル円 × ドル単価</div>
+            <div class="ref-display" x-text="'¥ ' + pCV.ドル円変換.toLocaleString()"></div>
+          </div>
         </div>
 
-        <hr class="section-divider">
-
-        <!-- 購入単価 -->
-        <div class="form-group">
-          <label>単価（円/パック）<span class="req">*</span></label>
-          <input type="number" x-model.number="pform.購入単価" min="0" step="1" @input="pCalc()" placeholder="0">
+        <!-- ⑧ 購入数（1カラム・参考表示） -->
+        <div class="form-group full">
+          <div class="calc-row">
+            <span class="calc-label">購入数（個）＝ 注文数 × 入り数</span>
+            <span class="calc-value" x-text="pCV.購入数.toLocaleString() + ' 個'"></span>
+          </div>
         </div>
 
-        <!-- 1個単価・税抜（参考） -->
+        <!-- ⑨ 1個単価（税抜） | 1個単価（税込/非課税）(2カラム・参考表示) -->
         <div class="form-group">
-          <div class="ref-label">1個単価（税抜）＝ 単価 ÷ 入数</div>
+          <div class="ref-label">1個単価（税抜）＝ 単価 ÷ 入り数</div>
           <div class="ref-display"
             x-text="'¥ ' + pCV.単価税抜.toLocaleString(undefined, {minimumFractionDigits:1, maximumFractionDigits:1})">
           </div>
         </div>
-
-        <!-- 海外：ドル単価 -->
-        <div class="form-group" x-show="pform.課税対象 === '海外｜非課税'">
-          <label>ドル単価（＄）</label>
-          <input type="number" x-model.number="pform.ドル単価" min="0" step="0.01" @input="pCalc()" placeholder="0.00">
-        </div>
-
-        <!-- 海外：ドル円レート -->
-        <div class="form-group" x-show="pform.課税対象 === '海外｜非課税'">
-          <label>ドル円（為替レート）</label>
-          <input type="number" x-model.number="pform.ドル円" min="1" step="0.01" @input="pCalc()" placeholder="160">
-        </div>
-
-        <!-- 海外：＄円変換（参考） -->
-        <div class="form-group" x-show="pform.課税対象 === '海外｜非課税'">
-          <div class="ref-label">＄円変換＝ ドル円 × ドル単価</div>
-          <div class="ref-display" x-text="'¥ ' + pCV.ドル円変換.toLocaleString()"></div>
-        </div>
-
-        <!-- 国内：1個単価・税込（参考） -->
-        <div class="form-group" x-show="pform.課税対象 === '国内'">
-          <div class="ref-label">1個単価（税込）＝ 単価 × 1.1 ÷ 入数</div>
+        <div class="form-group">
+          <div class="ref-label"
+            x-text="pform.課税対象 === '海外｜非課税' ? '1個単価（非課税）＝ 単価 ÷ 入り数' : '1個単価（税込）＝ 単価 × 1.1 ÷ 入り数'">
+          </div>
           <div class="ref-display"
             x-text="'¥ ' + pCV.単価税込.toLocaleString(undefined, {minimumFractionDigits:1, maximumFractionDigits:1})">
           </div>
         </div>
 
-        <hr class="section-divider">
-
-        <!-- 税抜き額（参考） -->
-        <div class="form-group">
-          <div class="ref-label">税抜き額（円）＝ 注文数 × 単価</div>
-          <div class="ref-display" x-text="'¥ ' + pCV.税抜額.toLocaleString()"></div>
-        </div>
-
-        <!-- 税込み額（メイン） -->
-        <div class="form-group">
-          <label>税込み額（円）</label>
+        <!-- 税込み額合計（1カラム・メイン） -->
+        <div class="form-group full">
+          <label style="font-size:12px;color:#666;">税込み額合計（円）</label>
           <div class="amount-display" x-text="'¥ ' + pCV.税込額.toLocaleString()"></div>
         </div>
 
-        <!-- 備考 -->
+        <!-- ⑩ 備考 (1カラム) -->
         <div class="form-group full">
           <label>備考</label>
           <textarea x-model="pform.備考" placeholder="任意：補足事項があれば入力"></textarea>
