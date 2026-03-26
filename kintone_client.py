@@ -228,7 +228,7 @@ async def sync_purchases_to_inventory() -> dict:
         ("fields[5]", "日付"),
         ("fields[6]", "出金区分"),
         ("fields[7]", "品目名"),
-        ("fields[8]", "班別"),
+        ("fields[8]", "班"),
     ]
     async with httpx.AsyncClient(timeout=30) as client:
         resp = await client.get(url, params=params, headers=_get_headers(TOKEN_794))
@@ -248,7 +248,7 @@ async def sync_purchases_to_inventory() -> dict:
         日付       = r["日付"]["value"]
         出金区分   = r["出金区分"]["value"]
         品目名     = r["品目名"]["value"]
-        班別       = r["班別"]["value"]
+        班別       = r["班"]["value"]
 
         if 購入数 <= 0:
             # 数量なし → 処理済にして次へ
