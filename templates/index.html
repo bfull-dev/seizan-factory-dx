@@ -271,6 +271,43 @@
     .pin-btn:active { background: #4fc3f7; color: #0d0f14; }
     .pin-btn.empty { background: transparent; cursor: default; }
     .pin-btn.back-btn { font-size: 20px; }
+    /* ── 在庫超過アラートモーダル ── */
+    .stock-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.55);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9998;
+    }
+    .stock-modal {
+      background: #fff;
+      border-radius: 10px;
+      padding: 32px 28px 24px;
+      max-width: 380px;
+      width: 90%;
+      box-shadow: 0 8px 32px rgba(0,0,0,.25);
+      text-align: center;
+    }
+    .stock-modal-icon {
+      font-size: 44px;
+      margin-bottom: 12px;
+    }
+    .stock-modal-title {
+      font-size: 16px;
+      font-weight: bold;
+      color: #c0392b;
+      margin-bottom: 14px;
+    }
+    .stock-modal-body {
+      font-size: 14px;
+      color: #444;
+      line-height: 1.7;
+      margin-bottom: 24px;
+    }
+    .stock-modal-body strong { color: #c0392b; }
+
     @keyframes pinShake {
       0%,100% { transform: translateX(0); }
       20%      { transform: translateX(-8px); }
@@ -311,6 +348,20 @@
         </button>
       </template>
     </div>
+  </div>
+</div>
+
+<!-- 在庫超過アラートモーダル -->
+<div class="stock-overlay" x-show="stockAlert.show" x-cloak>
+  <div class="stock-modal">
+    <div class="stock-modal-icon">⚠️</div>
+    <div class="stock-modal-title">在庫数オーバー</div>
+    <div class="stock-modal-body">
+      入力した数量（<strong x-text="stockAlert.qty"></strong> <span x-text="stockAlert.unit"></span>）が<br>
+      現在の在庫数（<strong x-text="stockAlert.stock"></strong> <span x-text="stockAlert.unit"></span>）を超えています。<br><br>
+      在庫数をオーバーしているので、<br><strong>責任者へ確認ください。</strong>
+    </div>
+    <button class="btn btn-primary" style="width:100%;" @click="stockAlert.show = false">閉じる</button>
   </div>
 </div>
 
@@ -547,6 +598,8 @@ function app() {
     acIndex: -1,
     history: [],
     toast: { show: false, msg: '', type: 'ok' },
+    selectedStock: null,   // 選択中品目の現在庫数
+    stockAlert: { show: false, qty: 0, stock: 0, unit: '' },
 
     init() {
       if (sessionStorage.getItem('pin_ok') === '1') {
@@ -627,6 +680,7 @@ function app() {
       this.form.用途区分  = item.区分;
       this.form.単位      = item.単位;
       this.form.単価      = Number(item.単価) || '';
+      this.selectedStock  = Number(item.現在庫数) || 0;
       this.calcAmount();
       this.acItems = [];
       this.acIndex = -1;
@@ -655,6 +709,21 @@ function app() {
     // ── 送信 ──
     async submit() {
       if (!this.isValid() || this.submitting) return;
+
+      // 在庫数チェック（品目コードあり＝在庫管理対象の品目のみ）
+      if (this.form.品目コード && this.selectedStock !== null) {
+        const qty = parseFloat(this.form.数量) || 0;
+        if (qty > this.selectedStock) {
+          this.stockAlert = {
+            show:  true,
+            qty:   qty,
+            stock: this.selectedStock,
+            unit:  this.form.単位 || '',
+          };
+          return;   // 送信しない
+        }
+      }
+
       this.submitting = true;
       const ym = String(this.form.year) + '/' +
         String(this.form.month).padStart(2, '0');

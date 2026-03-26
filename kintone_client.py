@@ -52,6 +52,7 @@ async def get_inventory_items() -> list[dict]:
             "単価":      r["移動平均単価"]["value"] or "0",
             "単位":      r["単位"]["value"],
             "班別":      r["班別"]["value"],
+            "現在庫数":  r["現在庫数"]["value"] or "0",
         }
         for r in records
     ]
