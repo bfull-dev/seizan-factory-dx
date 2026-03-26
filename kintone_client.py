@@ -182,7 +182,7 @@ _AUTO_CREATE_区分 = {"樹脂", "変動費（製造用）", "製造用消耗品
 
 
 async def _create_inventory_record(
-    品目コード: str, 品目名: str, 区分: str, 班別: str, 単価: float
+    品目コード: str, 品目名: str, 区分: str, 班別: str, 単価: float, 単位: str = ""
 ) -> None:
     """App 791 に在庫マスタレコードを新規作成する"""
     payload = {
@@ -192,6 +192,7 @@ async def _create_inventory_record(
             "品目名":        {"value": 品目名},
             "区分":          {"value": 区分},
             "班別":          {"value": 班別},
+            "単位":          {"value": 単位},
             "現在庫数":      {"value": "0"},
             "移動平均単価":  {"value": str(単価)},
             "最新単価":      {"value": str(単価)},
@@ -229,6 +230,7 @@ async def sync_purchases_to_inventory() -> dict:
         ("fields[6]", "出金区分"),
         ("fields[7]", "品目名"),
         ("fields[8]", "班"),
+        ("fields[9]", "単位"),
     ]
     async with httpx.AsyncClient(timeout=30) as client:
         resp = await client.get(url, params=params, headers=_get_headers(TOKEN_794))
@@ -249,6 +251,7 @@ async def sync_purchases_to_inventory() -> dict:
         出金区分   = r["出金区分"]["value"]
         品目名     = r["品目名"]["value"]
         班別       = r["班"]["value"]
+        単位       = r["単位"]["value"]
 
         if 購入数 <= 0:
             # 数量なし → 処理済にして次へ
@@ -261,7 +264,7 @@ async def sync_purchases_to_inventory() -> dict:
             # App791 に存在しない場合、対象区分なら自動作成
             if not inv:
                 if 出金区分 in _AUTO_CREATE_区分:
-                    await _create_inventory_record(品目コード, 品目名, 出金区分, 班別, 単価)
+                    await _create_inventory_record(品目コード, 品目名, 出金区分, 班別, 単価, 単位)
                     created += 1
                     inv = await _get_inventory_by_code(品目コード)
                     if not inv:
@@ -286,14 +289,17 @@ async def sync_purchases_to_inventory() -> dict:
             else:
                 新移動平均 = 単価
 
-            await _update_inventory_record(inv_id, {
+            update_fields = {
                 "現在庫数":      str(新在庫数),
                 "移動平均単価":  str(round(新移動平均, 1)),
                 "最新単価":      str(単価),
                 "最終購入日":    日付,
                 "累計購入数量":  str(累計数 + 購入数),
                 "累計購入金額":  str(累計額 + 金額),
-            })
+            }
+            if 単位:
+                update_fields["単位"] = 単位
+            await _update_inventory_record(inv_id, update_fields)
 
             await _mark_purchase_processed(record_id)
             processed += 1
