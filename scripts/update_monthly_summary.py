@@ -7,8 +7,8 @@ Usage:
 集計元アプリ:
   App 364: 千秋工場_製造管理（出荷売上）
   App 723: OEM売上
+  App 792: 使用材料・消耗品入力（Webフォーム）
   App 794: 出金管理
-  App 795: 使用材料・消耗品入力
 集計先アプリ:
   App 793: 月別サマリー
 """
@@ -25,14 +25,14 @@ load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env'))
 DOMAIN      = os.getenv("KINTONE_DOMAIN", "exk1223hafrf.cybozu.com")
 TOKEN_364   = os.getenv("KINTONE_TOKEN_364", "")
 TOKEN_723   = os.getenv("KINTONE_TOKEN_723", "")
+TOKEN_792   = os.getenv("KINTONE_TOKEN_792", "")   # 使用材料・消耗品入力（Webフォーム）
 TOKEN_794   = os.getenv("KINTONE_TOKEN_794", "")   # 出金管理
-TOKEN_795   = os.getenv("KINTONE_TOKEN_795", "")   # 使用材料・消耗品入力
 TOKEN_793   = os.getenv("KINTONE_TOKEN_793", "")   # 月別サマリー
 
 APP_SHIPPING = 364
 APP_OEM      = 723
-APP_EXPENSE  = 794
-APP_USAGE    = 795
+APP_USAGE    = 792   # 使用材料・消耗品入力
+APP_EXPENSE  = 794   # 出金管理
 APP_SUMMARY  = 793
 
 BASE = f"https://{DOMAIN}/k/v1"
@@ -132,25 +132,39 @@ def aggregate_oem(ym: str) -> int:
 
 def aggregate_usage(ym: str) -> dict:
     """
-    App 795（使用材料・消耗品入力）から製造原価を集計
+    App 792（使用材料・消耗品入力 Webフォーム）から製造原価を集計
+    入力種別='使用材料・消耗品' のレコードのみ対象
+    用途区分マッピング:
+      樹脂                → 製造原価_樹脂
+      変動費（製造用）    → 製造原価_変動費
+      量産用材料          → 製造原価_変動費（旧値 後方互換）
+      量産用消耗品        → 製造原価_変動費（旧値 後方互換）
+      その他・製造用備品  → 集計対象外
     戻り値: { 製造原価_樹脂, 製造原価_変動費 }
     """
-    if not TOKEN_795:
-        print("  [WARN] KINTONE_TOKEN_795 未設定 → 使用材料 = 0")
+    if not TOKEN_792:
+        print("  [WARN] KINTONE_TOKEN_792 未設定 → 使用材料 = 0")
         return {"製造原価_樹脂": 0, "製造原価_変動費": 0}
 
     d_from, d_to = ym_to_date_range(ym)
-    query = f'日付 >= "{d_from}" and 日付 <= "{d_to}"'
-    records = get_all_records(TOKEN_795, APP_USAGE, query, ["区分", "使用金額"])
+    query = (
+        f'入力種別 = "使用材料・消耗品"'
+        f' and 入力日 >= "{d_from}" and 入力日 <= "{d_to}"'
+    )
+    records = get_all_records(TOKEN_792, APP_USAGE, query, ["用途区分", "金額"])
 
     result = {"製造原価_樹脂": 0, "製造原価_変動費": 0}
+    # 変動費として集計する用途区分値（新旧両対応）
+    変動費区分 = {"変動費（製造用）", "量産用材料", "量産用消耗品"}
+
     for r in records:
-        cat = r["区分"]["value"]
-        amt = int(float(r["使用金額"]["value"] or 0))
+        cat = r["用途区分"]["value"]
+        amt = int(float(r["金額"]["value"] or 0))
         if cat == "樹脂":
             result["製造原価_樹脂"] += amt
-        elif cat == "変動費（製造用）":
+        elif cat in 変動費区分:
             result["製造原価_変動費"] += amt
+        # 製造用備品・その他・空白 は集計対象外
 
     for k, v in result.items():
         print(f"  {k}: ¥{v:,}")

@@ -83,6 +83,17 @@ async def history(ym: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ─── API: 購入→在庫同期 ────────────────────────────────────
+@app.post("/api/sync-inventory")
+async def sync_inventory():
+    """App794 未処理購入レコードを App791 在庫に反映する"""
+    try:
+        result = await kc.sync_purchases_to_inventory()
+        return {"ok": True, **result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ─── API: 月別サマリー即時集計 ──────────────────────────────
 @app.post("/api/run-summary")
 async def run_summary(ym: str):
