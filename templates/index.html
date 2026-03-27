@@ -467,10 +467,16 @@
                     <option value="国内">国内</option>
                     <option value="海外｜非課税">海外</option>
                   </select>
-                  <!-- ドル単価（海外の場合のみ表示） -->
-                  <div x-show="row.課税対象 === '海外｜非課税'" style="margin-top:3px;">
-                    <input type="number" :value="row.ドル単価" @input="row.ドル単価=parseFloat($event.target.value)||0; ptCalcRow(row)" placeholder="$単価" min="0" step="0.01" style="font-size:11px;">
-                    <input type="number" :value="row.ドル円" @input="row.ドル円=parseFloat($event.target.value)||160; ptCalcRow(row)" placeholder="ドル円" min="1" step="0.01" style="font-size:11px;margin-top:2px;">
+                  <!-- ドル単価・為替（海外の場合のみ表示） -->
+                  <div x-show="row.課税対象 === '海外｜非課税'" style="margin-top:4px; display:flex; flex-direction:column; gap:3px;">
+                    <div style="display:flex; align-items:center; gap:3px;">
+                      <span style="font-size:11px; color:#555; white-space:nowrap; font-weight:bold;">$</span>
+                      <input type="number" :value="row.ドル単価" @input="row.ドル単価=parseFloat($event.target.value)||0; ptCalcRow(row)" placeholder="請求単価" min="0" step="0.01" style="font-size:11px;">
+                    </div>
+                    <div style="display:flex; align-items:center; gap:3px;">
+                      <span style="font-size:11px; color:#555; white-space:nowrap; font-weight:bold;">＄円</span>
+                      <input type="number" :value="row.ドル円" @input="row.ドル円=parseFloat($event.target.value)||1; ptCalcRow(row)" placeholder="為替" min="1" step="0.01" style="font-size:11px;">
+                    </div>
                   </div>
                 </td>
                 <!-- 注文数 -->
@@ -486,8 +492,15 @@
                     <option value="枚">枚</option><option value="名">名</option>
                   </select>
                 </td>
-                <!-- 購入単価 -->
-                <td><input type="number" :value="row.購入単価" @input="row.購入単価=$event.target.value; ptCalcRow(row)" min="0" step="1" placeholder="0"></td>
+                <!-- 購入単価（海外は ドル単価×ドル円 で自動計算） -->
+                <td>
+                  <template x-if="row.課税対象 !== '海外｜非課税'">
+                    <input type="number" :value="row.購入単価" @input="row.購入単価=$event.target.value; ptCalcRow(row)" min="0" step="1" placeholder="0">
+                  </template>
+                  <template x-if="row.課税対象 === '海外｜非課税'">
+                    <input type="number" :value="row.購入単価" readonly style="background:#f0f4ff; color:#2980b9; font-weight:bold;" title="＄単価 × 為替レート">
+                  </template>
+                </td>
                 <!-- 税抜き額 -->
                 <td class="td-calc" x-text="'¥' + (row._税抜||0).toLocaleString()"></td>
                 <!-- 税込み額 -->
@@ -855,6 +868,22 @@ function app() {
     },
     stockAlert: { show: false, qty: 0, stock: 0, unit: '' },
 
+    usdJpy: 150,  // デフォルト値。init()で最新レートに更新
+
+    async fetchExchangeRate() {
+      try {
+        const res = await fetch('https://open.er-api.com/v6/latest/USD');
+        if (!res.ok) return;
+        const data = await res.json();
+        const rate = data?.rates?.JPY;
+        if (rate) {
+          this.usdJpy = Math.round(rate * 100) / 100;
+          // 既存行のドル円も更新（まだ手動変更していない行のみ）
+          this.ptRows.forEach(r => { if (r.課税対象 === '国内') r.ドル円 = this.usdJpy; });
+        }
+      } catch(e) { /* 取得失敗時はデフォルト値のまま */ }
+    },
+
     init() {
       if (sessionStorage.getItem('pin_ok') === '1') this.pinScreen = false;
       const today = new Date().toISOString().slice(0, 10);
@@ -862,6 +891,7 @@ function app() {
       this.utHeader.入力日  = today;
       this.ptRows = [this.ptDefaultRow()];
       this.utRows = [this.utDefaultRow()];
+      this.fetchExchangeRate();
       this.loadInventory();
       this.loadPurchaseSuggestions();
       this.ptLoadHistory();
@@ -889,7 +919,7 @@ function app() {
       return {
         出金区分: '', 品目名: '', 在庫品目コード: '', 課税対象: '国内',
         購入数量: '', 何個入り: 1, 単位: '式', 購入単価: '',
-        ドル単価: 0, ドル円: 160, 備考: '',
+        ドル単価: 0, ドル円: this.usdJpy, 備考: '',
         _税抜: 0, _税込: 0, _status: '',
         _acItems: [], _acIndex: -1,
       };
@@ -903,9 +933,15 @@ function app() {
     },
 
     ptCalcRow(row) {
-      const qty   = parseFloat(row.購入数量) || 0;
+      const qty  = parseFloat(row.購入数量) || 0;
+      const 海外 = row.課税対象 === '海外｜非課税';
+      if (海外) {
+        // ドル単価 × 為替レート → 購入単価（円）を自動計算
+        const usd = parseFloat(row.ドル単価) || 0;
+        const fx  = parseFloat(row.ドル円)   || 1;
+        row.購入単価 = Math.round(usd * fx);
+      }
       const 単価  = parseFloat(row.購入単価) || 0;
-      const 海外  = row.課税対象 === '海外｜非課税';
       row._税抜   = qty * 単価;
       row._税込   = 海外 ? row._税抜 : Math.round(row._税抜 * 1.1);
     },
@@ -994,7 +1030,7 @@ function app() {
         if (data.date)   this.ptHeader.日付   = data.date;
         // 行を追加
         if (data.items && data.items.length > 0) {
-          const exchRate = (data.currency === 'USD' && data.exchange_rate) ? data.exchange_rate : 160;
+          const exchRate = (data.currency === 'USD' && data.exchange_rate) ? data.exchange_rate : this.usdJpy;
           const newRows = data.items.map(item => {
             const row = this.ptDefaultRow();
             row.品目名       = item.品目名 || '';
