@@ -175,26 +175,31 @@ def aggregate_expenses(ym: str) -> dict:
     """
     App 794（出金管理）から出金区分別に集計
     樹脂・変動費（製造用）は在庫計上のみ（費用集計対象外）
-    戻り値: { 製造用備品, 外注費, 製造用消耗品, 固定費, 人件費, 人材派遣費,
+    税抜き・税込みをそれぞれ集計（海外仕入れは1.1倍しない）
+    戻り値: { 製造用備品, 製造用備品_税抜, 外注費, 外注費_税抜,
+              製造用消耗品, 製造用消耗品_税抜, 固定費, 人件費, 人材派遣費,
               水道光熱費, 福利厚生, 開発_実験, 事務用品, 輸送費_送料,
               設備投資, その他費用 }
     """
     if not TOKEN_794:
         print("  [WARN] KINTONE_TOKEN_794 未設定 → 出金管理 = 0")
         return {k: 0 for k in [
-            "製造用備品", "外注費", "製造用消耗品", "固定費", "人件費",
-            "人材派遣費", "水道光熱費", "福利厚生", "開発_実験",
+            "製造用備品", "製造用備品_税抜",
+            "外注費", "外注費_税抜",
+            "製造用消耗品", "製造用消耗品_税抜",
+            "固定費", "人件費", "人材派遣費",
+            "水道光熱費", "福利厚生", "開発_実験",
             "事務用品", "輸送費_送料", "設備投資", "その他費用"
         ]}
 
     d_from, d_to = ym_to_date_range(ym)
     query = f'日付 >= "{d_from}" and 日付 <= "{d_to}"'
-    # 税込み額フィールドを使用（国内=税抜×1.1、海外/非課税=税抜のまま）
-    records = get_all_records(TOKEN_794, APP_EXPENSE, query, ["出金区分", "税込み額"])
+    # 税込み額（国内=税抜×1.1、海外/非課税=税抜のまま）と税抜き額（金額）を両方取得
+    records = get_all_records(TOKEN_794, APP_EXPENSE, query, ["出金区分", "税込み額", "金額"])
 
-    # 出金区分 → App793フィールドコード マッピング
+    # 出金区分 → App793フィールドコード マッピング（税込み）
     # 樹脂・変動費（製造用）は在庫計上のみなので除外
-    区分map = {
+    区分map_税込 = {
         "製造用備品":   "製造用備品",
         "外注費":       "外注費",
         "製造用消耗品": "製造用消耗品",
@@ -209,17 +214,28 @@ def aggregate_expenses(ym: str) -> dict:
         "設備投資":     "設備投資",
         "その他":       "その他費用",
     }
+    # 税抜きを別途集計する区分（製造用備品・外注費・製造用消耗品のみ）
+    区分map_税抜 = {
+        "製造用備品":   "製造用備品_税抜",
+        "外注費":       "外注費_税抜",
+        "製造用消耗品": "製造用消耗品_税抜",
+    }
 
-    result = {v: 0 for v in 区分map.values()}
+    result = {v: 0 for v in 区分map_税込.values()}
+    result.update({v: 0 for v in 区分map_税抜.values()})
+
     skipped = 0
     for r in records:
         cat = r["出金区分"]["value"]
-        amt = int(float(r["税込み額"]["value"] or 0))
-        if cat in 区分map:
-            result[区分map[cat]] += amt
+        taxin = int(float(r["税込み額"]["value"] or 0))
+        taxex = int(float(r["金額"]["value"] or 0))
+        if cat in 区分map_税込:
+            result[区分map_税込[cat]] += taxin
         else:
             # 樹脂・変動費（製造用）は在庫計上のみ → スキップ
-            skipped += amt
+            skipped += taxin
+        if cat in 区分map_税抜:
+            result[区分map_税抜[cat]] += taxex
 
     for k, v in result.items():
         if v > 0:
