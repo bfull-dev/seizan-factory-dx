@@ -1453,7 +1453,11 @@ function app() {
 
     utItemInput(e, ri) {
       const val = e?.target?.value ?? '';
-      if (e?.type !== 'focus') this.utRows[ri].品目名 = val;
+      if (e?.type !== 'focus') {
+        this.utRows[ri].品目名 = val;
+        // 品目名を変更したら登録済み状態を解除（再登録可能にする）
+        if (this.utRows[ri]._status === '登録済') this.utRows[ri]._status = '';
+      }
       const q = (e?.type === 'focus' ? '' : val.trim()).toLowerCase();
       if (!q) {
         this.utRows[ri]._acItems = this.inventory.slice(0, 10);
@@ -1631,14 +1635,17 @@ function app() {
         this.showToast('班別と入力日は必須です', 'err'); return;
       }
       this.utSubmitting = true;
-      for (let i = 0; i < this.utRows.length; i++) {
-        const row = this.utRows[i];
-        if (row._status === '登録済' || !(row.品目名||'').trim() || !(parseFloat(row.数量) > 0)) continue;
-        await this.utReflectRow(i);
-        await new Promise(r => setTimeout(r, 150));
+      try {
+        for (let i = 0; i < this.utRows.length; i++) {
+          const row = this.utRows[i];
+          if (row._status === '登録済' || !(row.品目名||'').trim() || !(parseFloat(row.数量) > 0)) continue;
+          await this.utReflectRow(i);
+          await new Promise(r => setTimeout(r, 150));
+        }
+      } finally {
+        this.utSubmitting = false;
+        this.utRows = [this.utDefaultRow()];
       }
-      this.utSubmitting = false;
-      this.utRows = [this.utDefaultRow()];
     },
   };
 }
