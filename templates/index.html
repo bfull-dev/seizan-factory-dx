@@ -684,7 +684,6 @@
                         :class="{ active: ai === row._acIndex }"
                         @mousedown.prevent="utAcSelect(ai, ri)">
                         <span class="td-ac-name" x-text="item.品目名"></span>
-                        <span class="td-ac-code" x-text="item.品目コード"></span>
                         <span class="td-ac-price" x-text="'¥'+Number(item.単価).toLocaleString()+'/'+item.単位"></span>
                         <span class="td-ac-stock" x-text="'在庫:'+Number(item.現在庫数).toLocaleString()"></span>
                       </div>
@@ -1491,10 +1490,16 @@ function app() {
 
     async loadInventory() {
       try {
+        this.showToast('在庫を更新中...', 'ok');
         const res  = await fetch('/api/inventory');
+        if (!res.ok) throw new Error('HTTP ' + res.status);
         const data = await res.json();
         this.inventory = data.items || [];
-      } catch(e) { console.error('在庫取得エラー', e); }
+        this.showToast('在庫一覧を更新しました（' + this.inventory.length + '件）', 'ok');
+      } catch(e) {
+        this.showToast('在庫取得エラー: ' + e.message, 'err');
+        console.error('在庫取得エラー', e);
+      }
     },
 
     async loadHistory() {
@@ -1541,7 +1546,6 @@ function app() {
               inv.品目名.toLowerCase().includes((item.品目名||'').toLowerCase())
             );
             if (matched) {
-              row.品目コード = matched.品目コード;
               row.単価       = Number(matched.単価) || 0;
               row.用途区分   = matched.区分 || '';
               row._stock     = parseFloat(matched.現在庫数) || 0;
