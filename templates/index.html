@@ -166,14 +166,14 @@
     /* ── テーブル内AC ── */
     .td-ac-wrap { position: relative; min-width: 140px; }
     .td-ac-list {
-      position: absolute; top: 100%; left: 0; right: 0; min-width: 280px;
+      position: fixed; min-width: 280px;
       background: #fff; border: 1px solid #ccc; border-top: none;
       border-radius: 0 0 5px 5px; max-height: 200px; overflow-y: auto;
-      z-index: 200; box-shadow: 0 4px 12px rgba(0,0,0,.12); font-size: 12px;
+      z-index: 9000; box-shadow: 0 4px 12px rgba(0,0,0,.12); font-size: 12px;
     }
-    .td-ac-item { padding: 7px 10px; cursor: pointer; display: flex; align-items: baseline; gap: 6px; }
+    .td-ac-item { padding: 6px 10px; cursor: pointer; display: flex; align-items: center; gap: 6px; white-space: nowrap; overflow: hidden; }
     .td-ac-item:hover, .td-ac-item.active { background: #eaf4fc; }
-    .td-ac-name { flex: 1; }
+    .td-ac-name { flex: 1; overflow: hidden; text-overflow: ellipsis; }
     .td-ac-code { font-size: 10px; color: #999; }
     .td-ac-price { font-size: 11px; color: #27ae60; flex-shrink: 0; }
     .td-ac-stock { font-size: 10px; color: #2980b9; flex-shrink: 0; }
@@ -447,7 +447,9 @@
                     @blur="setTimeout(() => { row._acItems = [] }, 200)"
                     autocomplete="off"
                     placeholder="品目名">
-                  <div class="td-ac-list" x-show="row._acItems && row._acItems.length > 0">
+                  <div class="td-ac-list"
+                    x-show="row._acItems && row._acItems.length > 0"
+                    :style="{ top: (row._acTop||0)+'px', left: (row._acLeft||0)+'px', width: (row._acWidth||280)+'px' }">
                     <template x-for="(item, ai) in row._acItems" :key="item.品目名">
                       <div class="td-ac-item"
                         :class="{ active: ai === row._acIndex }"
@@ -455,6 +457,7 @@
                         <span class="td-ac-name" x-text="item.品目名"></span>
                         <span class="td-ac-code" x-text="item.在庫品目コード"></span>
                         <span class="td-ac-price" x-text="item.購入単価 ? '¥'+Number(item.購入単価).toLocaleString() : ''"></span>
+                        <span class="td-ac-stock" x-show="item.購入数量 && Number(item.購入数量) > 0" x-text="'前回:'+item.購入数量+item.単位"></span>
                       </div>
                     </template>
                   </div>
@@ -697,7 +700,9 @@
                     @blur="setTimeout(() => { row._acItems = [] }, 200)"
                     autocomplete="off"
                     placeholder="品目名または品目コード">
-                  <div class="td-ac-list" x-show="row._acItems && row._acItems.length > 0">
+                  <div class="td-ac-list"
+                    x-show="row._acItems && row._acItems.length > 0"
+                    :style="{ top: (row._acTop||0)+'px', left: (row._acLeft||0)+'px', width: (row._acWidth||280)+'px' }">
                     <template x-for="(item, ai) in row._acItems" :key="item.品目コード || item.品目名">
                       <div class="td-ac-item"
                         :class="{ active: ai === row._acIndex }"
@@ -921,7 +926,7 @@ function app() {
         購入数量: '', 何個入り: 1, 単位: '式', 購入単価: '',
         ドル単価: 0, ドル円: this.usdJpy, 備考: '',
         _税抜: 0, _税込: 0, _status: '',
-        _acItems: [], _acIndex: -1,
+        _acItems: [], _acIndex: -1, _acTop: 0, _acLeft: 0, _acWidth: 280,
       };
     },
 
@@ -952,14 +957,24 @@ function app() {
 
     ptItemInput(e, ri) {
       const val = e?.target?.value ?? '';
-      this.ptRows[ri].品目名 = val;
-      const q = val.trim().toLowerCase();
-      if (!q) { this.ptRows[ri]._acItems = []; return; }
-      this.ptRows[ri]._acItems = this.pSuggestions.filter(item =>
-        item.品目名.toLowerCase().includes(q) ||
-        (item.在庫品目コード && item.在庫品目コード.toLowerCase().includes(q))
-      ).slice(0, 8);
+      if (e?.type !== 'focus') this.ptRows[ri].品目名 = val;
+      const q = (e?.type === 'focus' ? '' : val.trim()).toLowerCase();
+      if (!q) {
+        this.ptRows[ri]._acItems = this.pSuggestions.slice(0, 10);
+      } else {
+        this.ptRows[ri]._acItems = this.pSuggestions.filter(item =>
+          item.品目名.toLowerCase().includes(q) ||
+          (item.在庫品目コード && item.在庫品目コード.toLowerCase().includes(q))
+        ).slice(0, 10);
+      }
       this.ptRows[ri]._acIndex = -1;
+      // dropdown を入力欄の直下に fixed 配置
+      if (e?.target) {
+        const r = e.target.getBoundingClientRect();
+        this.ptRows[ri]._acTop   = r.bottom;
+        this.ptRows[ri]._acLeft  = r.left;
+        this.ptRows[ri]._acWidth = Math.max(r.width, 280);
+      }
     },
     ptAcMove(dir, ri) {
       const row = this.ptRows[ri];
@@ -1130,7 +1145,7 @@ function app() {
       return {
         品目名: '', 品目コード: '', 用途区分: '', 数量: '', 単価: '', 単位: '',
         備考: '', _金額: 0, _stock: null, _status: '', _submitting: false,
-        _acItems: [], _acIndex: -1,
+        _acItems: [], _acIndex: -1, _acTop: 0, _acLeft: 0, _acWidth: 280,
       };
     },
 
@@ -1151,14 +1166,23 @@ function app() {
 
     utItemInput(e, ri) {
       const val = e?.target?.value ?? '';
-      this.utRows[ri].品目名 = val;
-      const q = val.trim().toLowerCase();
-      if (!q) { this.utRows[ri]._acItems = []; return; }
-      this.utRows[ri]._acItems = this.inventory.filter(item =>
-        item.品目名.toLowerCase().includes(q) ||
-        item.品目コード.toLowerCase().includes(q)
-      ).slice(0, 8);
+      if (e?.type !== 'focus') this.utRows[ri].品目名 = val;
+      const q = (e?.type === 'focus' ? '' : val.trim()).toLowerCase();
+      if (!q) {
+        this.utRows[ri]._acItems = this.inventory.slice(0, 10);
+      } else {
+        this.utRows[ri]._acItems = this.inventory.filter(item =>
+          item.品目名.toLowerCase().includes(q) ||
+          item.品目コード.toLowerCase().includes(q)
+        ).slice(0, 10);
+      }
       this.utRows[ri]._acIndex = -1;
+      if (e?.target) {
+        const r = e.target.getBoundingClientRect();
+        this.utRows[ri]._acTop   = r.bottom;
+        this.utRows[ri]._acLeft  = r.left;
+        this.utRows[ri]._acWidth = Math.max(r.width, 280);
+      }
     },
     utAcMove(dir, ri) {
       const row = this.utRows[ri];

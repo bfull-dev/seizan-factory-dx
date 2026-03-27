@@ -378,6 +378,7 @@ async def get_purchase_suggestions() -> list[dict]:
         ("fields[7]",  "ドル単価"),
         ("fields[8]",  "ドル円"),
         ("fields[9]",  "出金区分"),
+        ("fields[10]", "購入数量"),
         ("query", "order by 作成日時 desc limit 300"),
     ]
     async with httpx.AsyncClient(timeout=15) as client:
@@ -402,6 +403,7 @@ async def get_purchase_suggestions() -> list[dict]:
                 "ドル単価":      r["ドル単価"]["value"] or "0",
                 "ドル円":        r["ドル円"]["value"] or "160",
                 "出金区分":      r["出金区分"]["value"],
+                "購入数量":      r["購入数量"]["value"] or "0",
             })
     return suggestions
 
