@@ -800,6 +800,49 @@
       </template>
     </div><!-- /card -->
 
+    <!-- 現在の在庫一覧 -->
+    <div class="card">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;">
+        <span>現在の在庫一覧</span>
+        <button class="btn btn-secondary btn-sm" @click="loadInventory()">更新</button>
+      </div>
+      <template x-if="inventory.length === 0">
+        <div class="no-data">在庫データがありません</div>
+      </template>
+      <template x-if="inventory.length > 0">
+        <div style="overflow-x:auto;">
+          <table class="history-table">
+            <thead>
+              <tr>
+                <th>品目名</th>
+                <th>品目コード</th>
+                <th>区分</th>
+                <th class="num">現在庫数</th>
+                <th>単位</th>
+                <th class="num">単価（円）</th>
+                <th class="num">在庫評価額</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="item in inventory" :key="item.品目コード || item.品目名">
+                <tr>
+                  <td x-text="item.品目名"></td>
+                  <td style="font-size:11px;color:#999;" x-text="item.品目コード"></td>
+                  <td x-text="item.区分"></td>
+                  <td class="num"
+                    :style="Number(item.現在庫数) <= 0 ? 'color:#e74c3c;font-weight:bold;' : ''"
+                    x-text="Number(item.現在庫数).toLocaleString()"></td>
+                  <td x-text="item.単位"></td>
+                  <td class="num" x-text="'¥' + Number(item.単価).toLocaleString()"></td>
+                  <td class="num" x-text="'¥' + Math.round(Number(item.現在庫数) * Number(item.単価)).toLocaleString()"></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </template>
+    </div><!-- /在庫一覧 card -->
+
   </div><!-- /usage tab -->
 
 </div><!-- /content -->
