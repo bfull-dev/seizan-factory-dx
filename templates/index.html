@@ -702,8 +702,6 @@
                     <option value="">--</option>
                     <option>樹脂</option>
                     <option>変動費（製造用）</option>
-                    <option>製造用消耗品</option>
-                    <option>外注費</option>
                     <option>製造用備品</option>
                     <option>その他</option>
                   </select>
@@ -1461,14 +1459,10 @@ function app() {
         if (this.utRows[ri]._status === '登録済') this.utRows[ri]._status = '';
       }
       const q = (e?.type === 'focus' ? '' : val.trim()).toLowerCase();
-      // 在庫使用は「樹脂」「変動費（製造用）」のみ対象
-      const usageInventory = this.inventory.filter(item =>
-        item.区分 === '樹脂' || item.区分 === '変動費（製造用）'
-      );
       if (!q) {
-        this.utRows[ri]._acItems = usageInventory.slice(0, 10);
+        this.utRows[ri]._acItems = this.inventory.slice(0, 10);
       } else {
-        this.utRows[ri]._acItems = usageInventory.filter(item =>
+        this.utRows[ri]._acItems = this.inventory.filter(item =>
           item.品目名.toLowerCase().includes(q)
         ).slice(0, 10);
       }
