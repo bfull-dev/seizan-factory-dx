@@ -77,7 +77,7 @@ async def _get_inventory_by_name(品目名: str) -> dict | None:
     url = f"{_base()}/records.json"
     params = [
         ("app", APP_INVENTORY),
-        ("query", f'品目名 = "{品目名}" limit 1'),
+        ("query", f'品目名 = "{品目名}" order by 現在庫数 desc limit 1'),
         ("fields[0]", "レコード番号"),
         ("fields[1]", "現在庫数"),
         ("fields[2]", "移動平均単価"),
@@ -304,7 +304,12 @@ async def sync_purchases_to_inventory() -> dict:
                 if 出金区分 in _AUTO_CREATE_区分:
                     await _create_inventory_record(品目名, 出金区分, 班別, 単価, 単位)
                     created += 1
-                    inv = await _get_inventory_by_name(品目名)
+                    # Kintone 書き込み反映待ち（整合性遅延対策）
+                    for _ in range(3):
+                        await asyncio.sleep(1)
+                        inv = await _get_inventory_by_name(品目名)
+                        if inv:
+                            break
                     if not inv:
                         errors.append(f"品目名 '{品目名}' の自動作成後に取得できませんでした")
                         continue
