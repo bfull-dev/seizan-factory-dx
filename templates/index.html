@@ -1638,6 +1638,7 @@ function app() {
         await new Promise(r => setTimeout(r, 150));
       }
       this.utSubmitting = false;
+      this.utRows = [this.utDefaultRow()];
     },
   };
 }
