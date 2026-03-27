@@ -218,7 +218,7 @@ async def get_recent_usage(ym: str, limit: int = 20) -> list[dict]:
 # ─── 購入→在庫同期（App 794 → App 791）──────────────────────
 
 # App 791 自動作成の対象となる出金区分
-_AUTO_CREATE_区分 = {"樹脂", "変動費（製造用）", "製造用消耗品"}
+_AUTO_CREATE_区分 = {"樹脂", "変動費（製造用）"}
 
 
 async def _create_inventory_record(
@@ -270,7 +270,7 @@ async def _sync_purchases_to_inventory_inner() -> dict:
         ("app", APP_PURCHASE),
         ("query", (
             '品目名 != "" and 在庫反映状況 not in ("反映済") '
-            'and 出金区分 in ("樹脂", "変動費（製造用）", "製造用消耗品", "外注費", "製造用備品") '
+            'and 出金区分 in ("樹脂", "変動費（製造用）") '
             'order by 日付 asc limit 100'
         )),
         ("fields[0]", "レコード番号"),
