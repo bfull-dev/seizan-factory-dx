@@ -336,6 +336,9 @@
     <button class="tab-btn" :class="{ active: activeTab === 'usage' }" @click="switchTab('usage')">
       在庫使用
     </button>
+    <button class="tab-btn" :class="{ active: activeTab === 'summary' }" @click="switchTab('summary')">
+      月別サマリー
+    </button>
   </div>
 </div>
 
@@ -845,6 +848,214 @@
 
   </div><!-- /usage tab -->
 
+
+  <!-- ══════════════════════════════════════════════════════════
+       月別サマリータブ (App 793 + 792 + 794)
+  ══════════════════════════════════════════════════════════ -->
+  <div x-show="activeTab === 'summary'" x-cloak>
+
+    <!-- 年月セレクター -->
+    <div class="card" style="padding:16px 24px;">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <span style="font-weight:bold;color:#2c3e50;">対象年月</span>
+        <select x-model="smYear" style="width:auto;padding:6px 10px;">
+          {% for y in range(current_year - 2, current_year + 2) %}
+          <option value="{{ y }}" {% if y == current_year %}selected{% endif %}>{{ y }}年</option>
+          {% endfor %}
+        </select>
+        <select x-model="smMonth" style="width:auto;padding:6px 10px;">
+          {% for m in range(1, 13) %}
+          <option value="{{ m }}" {% if m == current_month %}selected{% endif %}>{{ m }}月</option>
+          {% endfor %}
+        </select>
+        <button class="btn-primary" @click="smLoad()" :disabled="smLoading"
+          style="padding:7px 20px;font-size:13px;">
+          <span x-show="!smLoading">読み込み</span>
+          <span x-show="smLoading">読み込み中…</span>
+        </button>
+        <span x-show="smError" x-text="smError" style="color:#e74c3c;font-size:13px;"></span>
+      </div>
+    </div>
+
+    <!-- KPI カード -->
+    <template x-if="smSummary">
+      <div>
+
+        <!-- サマリー合計 -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:20px;">
+          <div class="card" style="padding:16px;text-align:center;">
+            <div style="font-size:11px;color:#888;margin-bottom:4px;">総売上（税抜）</div>
+            <div style="font-size:22px;font-weight:bold;color:#2c3e50;" x-text="'¥' + Number(smSummary.総売上_税抜).toLocaleString()"></div>
+            <div style="font-size:11px;color:#aaa;margin-top:4px;">
+              出荷 ¥<span x-text="Number(smSummary.出荷売上_税抜).toLocaleString()"></span>
+              ／ OEM ¥<span x-text="Number(smSummary.OEM売上_税抜).toLocaleString()"></span>
+            </div>
+          </div>
+          <div class="card" style="padding:16px;text-align:center;">
+            <div style="font-size:11px;color:#888;margin-bottom:4px;">製造原価合計</div>
+            <div style="font-size:22px;font-weight:bold;color:#e67e22;" x-text="'¥' + Number(smSummary.製造原価合計).toLocaleString()"></div>
+          </div>
+          <div class="card" style="padding:16px;text-align:center;">
+            <div style="font-size:11px;color:#888;margin-bottom:4px;">全費用合計</div>
+            <div style="font-size:22px;font-weight:bold;color:#c0392b;" x-text="'¥' + Number(smSummary.全費用合計).toLocaleString()"></div>
+          </div>
+          <div class="card" style="padding:16px;text-align:center;">
+            <div style="font-size:11px;color:#888;margin-bottom:4px;">粗利</div>
+            <div style="font-size:22px;font-weight:bold;color:#27ae60;" x-text="'¥' + Number(smSummary.粗利).toLocaleString()"></div>
+            <div style="font-size:13px;font-weight:bold;margin-top:4px;"
+              :style="Number(smSummary.粗利率) >= 30 ? 'color:#27ae60' : 'color:#e74c3c'">
+              粗利率 <span x-text="smSummary.粗利率"></span>%
+            </div>
+          </div>
+        </div>
+
+        <!-- 製造原価内訳 -->
+        <div class="card">
+          <div class="card-title">製造原価 内訳（明細）</div>
+
+          <!-- 5カテゴリ順に表示 -->
+          <template x-for="cat in smCategories" :key="cat.key">
+            <div style="margin-bottom:24px;">
+              <!-- カテゴリヘッダー -->
+              <div style="display:flex;align-items:center;justify-content:space-between;
+                          background:#f0f4f8;border-left:4px solid #3498db;
+                          padding:8px 14px;border-radius:0 4px 4px 0;margin-bottom:8px;">
+                <span style="font-weight:bold;color:#2c3e50;" x-text="cat.label"></span>
+                <span style="font-size:13px;color:#555;">
+                  合計 ¥<span x-text="smCategoryTotal(cat.key).toLocaleString()"></span>
+                  （<span x-text="(smDetails[cat.key] || []).length"></span>件）
+                </span>
+              </div>
+
+              <!-- 明細テーブル -->
+              <template x-if="(smDetails[cat.key] || []).length > 0">
+                <div style="overflow-x:auto;">
+                  <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                    <thead>
+                      <tr style="background:#2c3e50;color:#fff;">
+                        <th style="padding:6px 10px;text-align:left;white-space:nowrap;">日付</th>
+                        <th style="padding:6px 10px;text-align:left;white-space:nowrap;">班</th>
+                        <th style="padding:6px 10px;text-align:left;">品目名</th>
+                        <th style="padding:6px 10px;text-align:right;white-space:nowrap;">数量</th>
+                        <template x-if="cat.hasTanka">
+                          <th style="padding:6px 10px;text-align:right;white-space:nowrap;">単価</th>
+                        </template>
+                        <template x-if="cat.hasTax">
+                          <th style="padding:6px 10px;text-align:right;white-space:nowrap;">税抜き額</th>
+                        </template>
+                        <th style="padding:6px 10px;text-align:right;white-space:nowrap;"
+                          x-text="cat.kinLabel"></th>
+                        <template x-if="cat.hasTax">
+                          <th style="padding:6px 10px;text-align:center;white-space:nowrap;">課税</th>
+                        </template>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <template x-for="(row, ri) in (smDetails[cat.key] || [])" :key="ri">
+                        <tr :style="ri % 2 === 0 ? '' : 'background:#f9f9f9'">
+                          <td style="padding:5px 10px;white-space:nowrap;" x-text="row.日付"></td>
+                          <td style="padding:5px 10px;white-space:nowrap;" x-text="row.班"></td>
+                          <td style="padding:5px 10px;" x-text="row.品目名"></td>
+                          <td style="padding:5px 10px;text-align:right;" x-text="Number(row.数量).toLocaleString()"></td>
+                          <template x-if="cat.hasTanka">
+                            <td style="padding:5px 10px;text-align:right;">
+                              ¥<span x-text="Number(row.単価).toLocaleString()"></span>
+                            </td>
+                          </template>
+                          <template x-if="cat.hasTax">
+                            <td style="padding:5px 10px;text-align:right;color:#555;">
+                              ¥<span x-text="Number(row.金額_税抜).toLocaleString()"></span>
+                            </td>
+                          </template>
+                          <td style="padding:5px 10px;text-align:right;font-weight:bold;">
+                            ¥<span x-text="Number(row.金額).toLocaleString()"></span>
+                          </td>
+                          <template x-if="cat.hasTax">
+                            <td style="padding:5px 10px;text-align:center;font-size:11px;"
+                              :style="row.課税対象 === '海外｜非課税' ? 'color:#e67e22;' : 'color:#888;'"
+                              x-text="row.課税対象 === '海外｜非課税' ? '海外' : '国内'"></td>
+                          </template>
+                        </tr>
+                      </template>
+                    </tbody>
+                    <tfoot>
+                      <tr style="background:#e67e22;color:#fff;font-weight:bold;">
+                        <td colspan="3" style="padding:6px 10px;">合計</td>
+                        <td style="padding:6px 10px;text-align:right;"
+                          x-text="smDetails[cat.key].reduce((s,r)=>s+Number(r.数量),0).toLocaleString()"></td>
+                        <template x-if="cat.hasTanka"><td></td></template>
+                        <template x-if="cat.hasTax">
+                          <td style="padding:6px 10px;text-align:right;">
+                            ¥<span x-text="smDetails[cat.key].reduce((s,r)=>s+Number(r.金額_税抜||0),0).toLocaleString()"></span>
+                          </td>
+                        </template>
+                        <td style="padding:6px 10px;text-align:right;">
+                          ¥<span x-text="smCategoryTotal(cat.key).toLocaleString()"></span>
+                        </td>
+                        <template x-if="cat.hasTax"><td></td></template>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </template>
+              <template x-if="!(smDetails[cat.key] || []).length">
+                <div style="color:#aaa;font-size:13px;padding:8px 14px;">（対象月のデータなし）</div>
+              </template>
+            </div>
+          </template>
+        </div><!-- /製造原価内訳 -->
+
+        <!-- 在庫状況 -->
+        <div class="card">
+          <div class="card-title">在庫状況</div>
+          <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+            <div>
+              <span style="font-size:13px;color:#555;">期末在庫評価額</span><br>
+              <span style="font-size:20px;font-weight:bold;color:#2c3e50;"
+                x-text="'¥' + Number(smSummary.期末在庫評価額).toLocaleString()"></span>
+            </div>
+            <div>
+              <span style="font-size:13px;color:#555;">設備投資（参考）</span><br>
+              <span style="font-size:16px;font-weight:bold;color:#7f8c8d;"
+                x-text="'¥' + Number(smSummary.設備投資).toLocaleString()"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 費用詳細 -->
+        <div class="card">
+          <div class="card-title">費用詳細</div>
+          <table style="width:100%;border-collapse:collapse;font-size:13px;max-width:600px;">
+            <template x-for="row in smExpenseRows" :key="row.label">
+              <tr>
+                <td style="padding:5px 12px;color:#555;" x-text="row.label"></td>
+                <td style="padding:5px 12px;text-align:right;font-weight:bold;">
+                  ¥<span x-text="Number(smSummary[row.key]).toLocaleString()"></span>
+                </td>
+              </tr>
+            </template>
+            <tr style="background:#2c3e50;color:#fff;font-weight:bold;">
+              <td style="padding:7px 12px;">全費用合計（設備投資除く）</td>
+              <td style="padding:7px 12px;text-align:right;">
+                ¥<span x-text="Number(smSummary.全費用合計).toLocaleString()"></span>
+              </td>
+            </tr>
+          </table>
+        </div>
+
+      </div>
+    </template>
+
+    <!-- 未読み込み状態 -->
+    <template x-if="!smSummary && !smLoading">
+      <div class="card" style="text-align:center;color:#aaa;padding:40px;">
+        年月を選択して「読み込み」ボタンを押してください
+      </div>
+    </template>
+
+  </div><!-- /summary tab -->
+
+
 </div><!-- /content -->
 
 <!-- トースト通知 -->
@@ -861,7 +1072,66 @@ function app() {
     switchTab(tab) {
       this.activeTab = tab;
       if (tab === 'purchase') this.ptLoadHistory();
-      else { this.loadHistory(); }
+      else if (tab === 'usage') this.loadHistory();
+      else if (tab === 'summary') this.smLoad();
+    },
+
+    // ─── 月別サマリータブ ──────────────────────────────
+    smYear:    {{ current_year }},
+    smMonth:   {{ current_month }},
+    smLoading: false,
+    smSummary: null,
+    smDetails: null,
+    smError:   '',
+
+    smCategories: [
+      { key: '樹脂',        label: '樹脂',        hasTanka: true,  kinLabel: '金額' },
+      { key: '変動費',      label: '変動費（製造用）', hasTanka: true,  kinLabel: '金額' },
+      { key: '製造用備品',  label: '製造用備品',  hasTanka: false, hasTax: true, kinLabel: '税込み額' },
+      { key: '外注費',      label: '外注費',      hasTanka: false, hasTax: true, kinLabel: '税込み額' },
+      { key: '製造用消耗品',label: '製造用消耗品',hasTanka: false, hasTax: true, kinLabel: '税込み額' },
+    ],
+
+    smExpenseRows: [
+      { label: '固定費',       key: '固定費' },
+      { label: '人件費',       key: '人件費' },
+      { label: '人材派遣費',   key: '人材派遣費' },
+      { label: '水道光熱費',   key: '水道光熱費' },
+      { label: '福利厚生',     key: '福利厚生' },
+      { label: '開発・実験',   key: '開発_実験' },
+      { label: '事務用品',     key: '事務用品' },
+      { label: '輸送費・送料', key: '輸送費_送料' },
+      { label: 'その他費用',   key: 'その他費用' },
+    ],
+
+    smGetYM() {
+      return `${this.smYear}/${String(this.smMonth).padStart(2, '0')}`;
+    },
+
+    smCategoryTotal(key) {
+      if (!this.smDetails || !this.smDetails[key]) return 0;
+      return this.smDetails[key].reduce((s, r) => s + Number(r.金額 || 0), 0);
+    },
+
+    async smLoad() {
+      this.smLoading = true;
+      this.smError   = '';
+      this.smSummary = null;
+      this.smDetails = null;
+      const ym = this.smGetYM();
+      try {
+        const [sr, dr] = await Promise.all([
+          fetch(`/api/summary?ym=${encodeURIComponent(ym)}`).then(r => r.json()),
+          fetch(`/api/summary/details?ym=${encodeURIComponent(ym)}`).then(r => r.json()),
+        ]);
+        this.smSummary = sr.summary;
+        this.smDetails = dr.details;
+        if (!this.smSummary) this.smError = `${ym} のサマリーデータがありません`;
+      } catch(e) {
+        this.smError = 'エラー: ' + e.message;
+      } finally {
+        this.smLoading = false;
+      }
     },
 
     // ─── PIN ─────────────────────────────────────────

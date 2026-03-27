@@ -1,4 +1,5 @@
 """Kintone REST API クライアント"""
+import asyncio
 import os
 import io
 import base64
@@ -9,6 +10,7 @@ from typing import Any
 DOMAIN    = os.getenv("KINTONE_DOMAIN", "exk1223hafrf.cybozu.com")
 TOKEN_791 = os.getenv("KINTONE_TOKEN_791", "")
 TOKEN_792 = os.getenv("KINTONE_TOKEN_792", "")
+TOKEN_793 = os.getenv("KINTONE_TOKEN_793", "")
 TOKEN_794 = os.getenv("KINTONE_TOKEN_794", "")
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
@@ -16,6 +18,7 @@ GEMINI_MODEL   = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
 
 APP_INVENTORY = 791
 APP_USAGE     = 792   # 使用材料・消耗品入力（Webフォーム書き込み先）
+APP_SUMMARY   = 793   # 月別サマリー
 APP_PURCHASE  = 794   # 出金管理（購入記録）
 
 
@@ -411,8 +414,12 @@ async def get_purchase_suggestions() -> list[dict]:
 async def create_purchase_record(data: dict[str, Any]) -> dict:
     """App 794 に購入レコードを登録する"""
     url = f"{_base()}/record.json"
+    # 対象年月を日付から自動計算 (YYYY/MM)
+    date_val = data.get("日付", "")
+    対象年月 = date_val[:7].replace("-", "/") if date_val else ""
     record: dict[str, Any] = {
-        "日付":           {"value": data["日付"]},
+        "日付":           {"value": date_val},
+        "対象年月":       {"value": 対象年月},
         "班":             {"value": data["班"]},
         "出金区分":       {"value": data["出金区分"]},
         "品目名":         {"value": data["品目名"]},
@@ -611,3 +618,128 @@ async def get_recent_purchases(ym: str, limit: int = 30) -> list[dict]:
         }
         for r in records
     ]
+
+
+# ─── 月別サマリー（App 793）──────────────────────────────────
+
+async def get_monthly_summary(ym: str) -> dict | None:
+    """App 793 から対象年月のサマリーレコードを取得"""
+    if not TOKEN_793:
+        return None
+    url = f"{_base()}/records.json"
+    params = [("app", APP_SUMMARY), ("query", f'対象年月 = "{ym}" limit 1')]
+    async with httpx.AsyncClient(timeout=10) as client:
+        resp = await client.get(url, params=params, headers=_get_headers(TOKEN_793))
+        resp.raise_for_status()
+        recs = resp.json()["records"]
+    if not recs:
+        return None
+    r = recs[0]
+    def _v(field: str) -> str:
+        return r.get(field, {}).get("value", "") or "0"
+    return {
+        "対象年月":         r["対象年月"]["value"],
+        "出荷売上_税抜":    _v("出荷売上_税抜"),
+        "OEM売上_税抜":     _v("OEM売上_税抜"),
+        "総売上_税抜":      _v("総売上_税抜"),
+        "製造原価_樹脂":    _v("製造原価_樹脂"),
+        "製造原価_変動費":  _v("製造原価_変動費"),
+        "製造用備品":       _v("製造用備品"),
+        "製造用備品_税抜":  _v("製造用備品_税抜"),
+        "外注費":           _v("外注費"),
+        "外注費_税抜":      _v("外注費_税抜"),
+        "製造用消耗品":     _v("製造用消耗品"),
+        "製造用消耗品_税抜": _v("製造用消耗品_税抜"),
+        "製造原価合計":     _v("製造原価合計"),
+        "固定費":           _v("固定費"),
+        "人件費":           _v("人件費"),
+        "水道光熱費":       _v("水道光熱費"),
+        "人材派遣費":       _v("人材派遣費"),
+        "福利厚生":         _v("福利厚生"),
+        "開発_実験":        _v("開発_実験"),
+        "事務用品":         _v("事務用品"),
+        "輸送費_送料":      _v("輸送費_送料"),
+        "その他費用":       _v("その他費用"),
+        "全費用合計":       _v("全費用合計"),
+        "粗利":             _v("粗利"),
+        "粗利率":           _v("粗利率"),
+        "設備投資":         _v("設備投資"),
+        "期末在庫評価額":   _v("期末在庫評価額"),
+    }
+
+
+# 変動費として扱う用途区分（App 792）
+_変動費区分 = {"変動費（製造用）", "量産用材料", "量産用消耗品"}
+
+
+async def get_manufacturing_cost_details(ym: str) -> dict:
+    """
+    App 792（使用材料: 樹脂・変動費）と App 794（出金管理: 製造用備品・外注費・製造用消耗品）
+    から対象月の明細を取得し、カテゴリ別に返す。
+    """
+    params_792 = [
+        ("app", APP_USAGE),
+        ("query", f'入力種別 in ("使用材料・消耗品") and 対象年月 = "{ym}" order by 入力日 asc limit 500'),
+        ("fields[0]", "入力日"),
+        ("fields[1]", "班別"),
+        ("fields[2]", "品目名"),
+        ("fields[3]", "用途区分"),
+        ("fields[4]", "数量"),
+        ("fields[5]", "単価"),
+        ("fields[6]", "金額"),
+    ]
+    params_794 = [
+        ("app", APP_PURCHASE),
+        ("query", f'対象年月 = "{ym}" and 出金区分 in ("製造用備品", "外注費", "製造用消耗品") order by 日付 asc limit 500'),
+        ("fields[0]", "日付"),
+        ("fields[1]", "班"),
+        ("fields[2]", "品目名"),
+        ("fields[3]", "出金区分"),
+        ("fields[4]", "購入数量"),
+        ("fields[5]", "税込み額"),
+        ("fields[6]", "金額"),        # 税抜き額
+        ("fields[7]", "課税対象"),
+    ]
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        r792_task = client.get(f"{_base()}/records.json", params=params_792, headers=_get_headers(TOKEN_792))
+        r794_task = client.get(f"{_base()}/records.json", params=params_794, headers=_get_headers(TOKEN_794))
+        r792, r794 = await asyncio.gather(r792_task, r794_task)
+        r792.raise_for_status()
+        r794.raise_for_status()
+
+    result: dict[str, list] = {
+        "樹脂": [], "変動費": [], "製造用備品": [], "外注費": [], "製造用消耗品": []
+    }
+
+    for r in r792.json()["records"]:
+        cat = r["用途区分"]["value"]
+        item = {
+            "日付": r["入力日"]["value"],
+            "班":   r["班別"]["value"],
+            "品目名": r["品目名"]["value"],
+            "数量": r["数量"]["value"] or "0",
+            "単価": r["単価"]["value"] or "0",
+            "金額": r["金額"]["value"] or "0",
+        }
+        if cat == "樹脂":
+            result["樹脂"].append(item)
+        elif cat in _変動費区分:
+            result["変動費"].append(item)
+
+    for r in r794.json()["records"]:
+        cat = r["出金区分"]["value"]
+        item = {
+            "日付":     r["日付"]["value"],
+            "班":       r["班"]["value"],
+            "品目名":   r["品目名"]["value"],
+            "数量":     r["購入数量"]["value"] or "0",
+            "単価":     "",
+            "金額_税抜": r["金額"]["value"] or "0",       # 税抜き（購入数量×購入単価）
+            "金額":     r["税込み額"]["value"] or "0",    # 税込み（課税区分考慮済み）
+            "課税対象": r["課税対象"]["value"],
+        }
+        if cat in result:
+            result[cat].append(item)
+
+    return result
