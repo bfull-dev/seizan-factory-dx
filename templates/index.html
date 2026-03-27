@@ -1595,8 +1595,18 @@ function app() {
           body: JSON.stringify(payload),
         });
         if (!res.ok) { const err = await res.json(); throw new Error(err.detail || '送信失敗'); }
+        const resData = await res.json();
         row._status = '登録済';
-        this.showToast('反映しました：' + payload.品目名, 'ok');
+        // ローカルの在庫数を即時更新（次の行の在庫超過チェック用）
+        if (row._stock !== null) {
+          row._stock = Math.max(0, row._stock - (parseFloat(row.数量) || 0));
+        }
+        if (!resData.inventory_decreased) {
+          const reason = resData.inventory_error || '在庫リストに該当品目なし';
+          this.showToast('登録済（在庫未反映: ' + reason + '）', 'err');
+        } else {
+          this.showToast('反映しました：' + payload.品目名, 'ok');
+        }
         this.loadHistory();
         this.loadInventory();
       } catch(e) {
@@ -1607,7 +1617,16 @@ function app() {
 
     async utReflectAll() {
       const pending = this.utRows.filter(r => r._status !== '登録済' && (r.品目名||'').trim() && parseFloat(r.数量) > 0);
-      if (!pending.length) { this.showToast('未登録の品目がありません', 'err'); return; }
+      if (!pending.length) {
+        // 品目名は入力済みだが数量が空の行がある場合は具体的にエラーを表示
+        const missingQty = this.utRows.filter(r => r._status !== '登録済' && (r.品目名||'').trim() && !(parseFloat(r.数量) > 0));
+        if (missingQty.length) {
+          this.showToast('数量が未入力の行があります（' + missingQty.map(r=>r.品目名).join('、') + '）', 'err');
+        } else {
+          this.showToast('登録する品目がありません。品目名と数量を入力してください', 'err');
+        }
+        return;
+      }
       if (!this.utHeader.班別 || !this.utHeader.入力日) {
         this.showToast('班別と入力日は必須です', 'err'); return;
       }

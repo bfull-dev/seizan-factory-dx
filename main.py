@@ -68,7 +68,12 @@ class UsageIn(BaseModel):
 async def create_usage(body: UsageIn):
     try:
         result = await kc.create_usage_record(body.model_dump())
-        return {"id": result.get("id"), "revision": result.get("revision")}
+        return {
+            "id": result.get("id"),
+            "revision": result.get("revision"),
+            "inventory_decreased": result.get("inventory_decreased", False),
+            "inventory_error": result.get("inventory_error"),
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

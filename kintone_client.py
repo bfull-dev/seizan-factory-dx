@@ -147,14 +147,19 @@ async def create_usage_record(data: dict[str, Any]) -> dict:
     # 品目名があれば App 791 在庫を減算
     品目名 = data.get("品目名", "")
     数量 = float(data.get("数量", 0) or 0)
+    inventory_decreased = False
+    inventory_error: str | None = None
     if 品目名 and 数量 > 0:
         try:
-            await decrease_inventory(品目名, 数量)
+            inventory_decreased = await decrease_inventory(品目名, 数量)
+            if not inventory_decreased:
+                inventory_error = f"品目「{品目名}」が在庫リスト(App791)に見つかりません"
+                print(f"[WARN] 在庫減算スキップ: {inventory_error}")
         except Exception as e:
-            # 在庫減算失敗は致命的ではないのでログのみ
+            inventory_error = str(e)
             print(f"[WARN] 在庫減算エラー ({品目名}): {e}")
 
-    return result
+    return {**result, "inventory_decreased": inventory_decreased, "inventory_error": inventory_error}
 
 
 async def get_usage_record(record_id: str) -> dict:
