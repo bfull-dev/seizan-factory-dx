@@ -56,7 +56,6 @@ class UsageIn(BaseModel):
     対象年月:  str = Field(..., pattern=r"^\d{4}/\d{2}$")
     入力日:    str
     班別:      str
-    品目コード: str = ""
     品目名:    str
     用途区分:  str = ""
     数量:      float = Field(ge=0)
@@ -97,12 +96,11 @@ async def purchase_suggestions():
 
 # ─── API: 購入レコード登録 ──────────────────────────────────
 class PurchaseIn(BaseModel):
-    日付:           str
-    班:             str
-    出金区分:       str
-    品目名:         str
-    在庫品目コード: str = ""
-    購入先:         str = ""
+    日付:     str
+    班:       str
+    出金区分: str
+    品目名:   str
+    購入先:   str = ""
     課税対象:       str = "国内"
     購入数量:       float = Field(ge=0)
     何個入り:       float = Field(ge=1, default=1)
@@ -116,8 +114,9 @@ class PurchaseIn(BaseModel):
 @app.post("/api/purchase")
 async def create_purchase(body: PurchaseIn, background_tasks: BackgroundTasks):
     try:
+        _SYNC_区分 = {"樹脂", "変動費（製造用）", "製造用消耗品", "外注費", "製造用備品"}
         result = await kc.create_purchase_record(body.model_dump())
-        if body.在庫品目コード:
+        if body.出金区分 in _SYNC_区分:
             async def _sync():
                 try:
                     await kc.sync_purchases_to_inventory()
@@ -207,7 +206,8 @@ async def create_purchases_bulk(body: PurchaseBulkIn, background_tasks: Backgrou
             merged = {**body.header, **row.model_dump()}
             result = await kc.create_purchase_record(merged)
             results.append({"id": result.get("id")})
-        if any(r.在庫品目コード for r in body.rows):
+        _SYNC_区分 = {"樹脂", "変動費（製造用）", "製造用消耗品", "外注費", "製造用備品"}
+        if any(r.出金区分 in _SYNC_区分 for r in body.rows):
             async def _sync():
                 try:
                     await kc.sync_purchases_to_inventory()
@@ -235,6 +235,27 @@ async def create_usages_bulk(body: UsageBulkIn):
             result = await kc.create_usage_record(merged)
             results.append({"ok": True, "id": result.get("id")})
         return {"count": len(results), "results": results}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ─── API: 月別サマリー取得 ──────────────────────────────────
+@app.get("/api/summary")
+async def get_summary(ym: str):
+    """App 793 の月別サマリーを取得"""
+    try:
+        summary = await kc.get_monthly_summary(ym)
+        return {"summary": summary}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/summary/details")
+async def get_summary_details(ym: str):
+    """製造原価内訳の明細を取得（App 792 使用材料 + App 794 出金管理）"""
+    try:
+        details = await kc.get_manufacturing_cost_details(ym)
+        return {"details": details}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

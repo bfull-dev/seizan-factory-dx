@@ -40,13 +40,12 @@ async def get_inventory_items() -> list[dict]:
     url = f"{_base()}/records.json"
     params = [
         ("app", APP_INVENTORY),
-        ("fields[0]", "品目コード"),
-        ("fields[1]", "品目名"),
-        ("fields[2]", "区分"),
-        ("fields[3]", "移動平均単価"),
-        ("fields[4]", "単位"),
-        ("fields[5]", "班別"),
-        ("fields[6]", "現在庫数"),
+        ("fields[0]", "品目名"),
+        ("fields[1]", "区分"),
+        ("fields[2]", "移動平均単価"),
+        ("fields[3]", "単位"),
+        ("fields[4]", "班別"),
+        ("fields[5]", "現在庫数"),
         ("query", "limit 500"),
     ]
     async with httpx.AsyncClient(timeout=10) as client:
@@ -54,30 +53,29 @@ async def get_inventory_items() -> list[dict]:
         resp.raise_for_status()
         records = resp.json()["records"]
 
-    # 品目コードで重複除去（在庫数が多いレコードを優先）
+    # 品目名で重複除去（在庫数が多いレコードを優先）
     seen: dict[str, dict] = {}
     for r in records:
-        code = r["品目コード"]["value"] or r["品目名"]["value"]
+        name = r["品目名"]["value"]
         item = {
-            "品目コード": r["品目コード"]["value"],
-            "品目名":    r["品目名"]["value"],
+            "品目名":    name,
             "区分":      r["区分"]["value"],
             "単価":      r["移動平均単価"]["value"] or "0",
             "単位":      r["単位"]["value"],
             "班別":      r["班別"]["value"],
             "現在庫数":  r["現在庫数"]["value"] or "0",
         }
-        if code not in seen or float(item["現在庫数"]) > float(seen[code]["現在庫数"]):
-            seen[code] = item
+        if name not in seen or float(item["現在庫数"]) > float(seen[name]["現在庫数"]):
+            seen[name] = item
     return list(seen.values())
 
 
-async def _get_inventory_by_code(品目コード: str) -> dict | None:
-    """品目コードで App 791 レコードを1件取得"""
+async def _get_inventory_by_name(品目名: str) -> dict | None:
+    """品目名で App 791 レコードを1件取得"""
     url = f"{_base()}/records.json"
     params = [
         ("app", APP_INVENTORY),
-        ("query", f'品目コード = "{品目コード}" limit 1'),
+        ("query", f'品目名 = "{品目名}" limit 1'),
         ("fields[0]", "レコード番号"),
         ("fields[1]", "現在庫数"),
         ("fields[2]", "移動平均単価"),
@@ -107,9 +105,9 @@ async def _update_inventory_record(record_id: str, fields: dict[str, str]) -> No
         resp.raise_for_status()
 
 
-async def decrease_inventory(品目コード: str, 数量: float) -> bool:
+async def decrease_inventory(品目名: str, 数量: float) -> bool:
     """消費登録時に App 791 の在庫数を減算する"""
-    inv = await _get_inventory_by_code(品目コード)
+    inv = await _get_inventory_by_name(品目名)
     if not inv:
         return False
     record_id = inv["レコード番号"]["value"]
@@ -131,7 +129,6 @@ async def create_usage_record(data: dict[str, Any]) -> dict:
             "対象年月": {"value": data["対象年月"]},
             "入力日":   {"value": data["入力日"]},
             "班別":     {"value": data["班別"]},
-            "品目コード": {"value": data.get("品目コード", "")},
             "品目名":   {"value": data["品目名"]},
             "用途区分": {"value": data.get("用途区分", "")},
             "数量":     {"value": str(data.get("数量", ""))},
@@ -145,15 +142,15 @@ async def create_usage_record(data: dict[str, Any]) -> dict:
         resp.raise_for_status()
         result = resp.json()
 
-    # 在庫品目コードがあれば App 791 在庫を減算
-    品目コード = data.get("品目コード", "")
+    # 品目名があれば App 791 在庫を減算
+    品目名 = data.get("品目名", "")
     数量 = float(data.get("数量", 0) or 0)
-    if 品目コード and 数量 > 0:
+    if 品目名 and 数量 > 0:
         try:
-            await decrease_inventory(品目コード, 数量)
+            await decrease_inventory(品目名, 数量)
         except Exception as e:
             # 在庫減算失敗は致命的ではないのでログのみ
-            print(f"[WARN] 在庫減算エラー ({品目コード}): {e}")
+            print(f"[WARN] 在庫減算エラー ({品目名}): {e}")
 
     return result
 
@@ -168,7 +165,6 @@ async def get_usage_record(record_id: str) -> dict:
         r = resp.json()["record"]
     return {
         "班別":      r["班別"]["value"],
-        "品目コード": r["品目コード"]["value"],
         "品目名":    r["品目名"]["value"],
         "用途区分":  r["用途区分"]["value"],
         "数量":      r["数量"]["value"] or "0",
@@ -216,13 +212,12 @@ _AUTO_CREATE_区分 = {"樹脂", "変動費（製造用）", "製造用消耗品
 
 
 async def _create_inventory_record(
-    品目コード: str, 品目名: str, 区分: str, 班別: str, 単価: float, 単位: str = ""
+    品目名: str, 区分: str, 班別: str, 単価: float, 単位: str = ""
 ) -> None:
     """App 791 に在庫マスタレコードを新規作成する"""
     payload = {
         "app": APP_INVENTORY,
         "record": {
-            "品目コード":    {"value": 品目コード},
             "品目名":        {"value": 品目名},
             "区分":          {"value": 区分},
             "班別":          {"value": 班別},
@@ -240,31 +235,33 @@ async def _create_inventory_record(
             headers=_post_headers(TOKEN_791)
         )
         resp.raise_for_status()
-    print(f"[INFO] App791 新規作成: 品目コード='{品目コード}' 区分='{区分}'")
+    print(f"[INFO] App791 新規作成: 品目名='{品目名}' 区分='{区分}'")
 
 
 async def sync_purchases_to_inventory() -> dict:
     """
-    App 794 の未処理購入レコード（在庫品目コードあり）を
-    App 791 に反映（在庫数加算・移動平均単価更新）する。
+    App 794 の未処理購入レコードを App 791 に反映（在庫数加算・移動平均単価更新）する。
     出金区分が対象区分（樹脂/変動費（製造用）/製造用消耗品/外注費）の場合、
-    App 791 に品目コードが存在しなければ自動作成する。
+    App 791 に品目名が存在しなければ自動作成する。
     処理済レコードには在庫反映状況='反映済'をセット。
     """
     url = f"{_base()}/records.json"
     params = [
         ("app", APP_PURCHASE),
-        ("query", '在庫品目コード != "" and 在庫反映状況 not in ("反映済") order by 日付 asc limit 100'),
+        ("query", (
+            '品目名 != "" and 在庫反映状況 not in ("反映済") '
+            'and 出金区分 in ("樹脂", "変動費（製造用）", "製造用消耗品", "外注費", "製造用備品") '
+            'order by 日付 asc limit 100'
+        )),
         ("fields[0]", "レコード番号"),
-        ("fields[1]", "在庫品目コード"),
-        ("fields[2]", "購入数"),
-        ("fields[3]", "単位価格_税抜"),
-        ("fields[4]", "金額"),
-        ("fields[5]", "日付"),
-        ("fields[6]", "出金区分"),
-        ("fields[7]", "品目名"),
-        ("fields[8]", "班"),
-        ("fields[9]", "単位"),
+        ("fields[1]", "購入数"),
+        ("fields[2]", "単位価格_税抜"),
+        ("fields[3]", "金額"),
+        ("fields[4]", "日付"),
+        ("fields[5]", "出金区分"),
+        ("fields[6]", "品目名"),
+        ("fields[7]", "班"),
+        ("fields[8]", "単位"),
     ]
     async with httpx.AsyncClient(timeout=30) as client:
         resp = await client.get(url, params=params, headers=_get_headers(TOKEN_794))
@@ -277,13 +274,12 @@ async def sync_purchases_to_inventory() -> dict:
 
     for r in purchase_records:
         record_id  = r["レコード番号"]["value"]
-        品目コード  = r["在庫品目コード"]["value"]
+        品目名     = r["品目名"]["value"]
         購入数     = float(r["購入数"]["value"] or 0)
         単価       = float(r["単位価格_税抜"]["value"] or 0)
         金額       = float(r["金額"]["value"] or 0)
         日付       = r["日付"]["value"]
         出金区分   = r["出金区分"]["value"]
-        品目名     = r["品目名"]["value"]
         班別       = r["班"]["value"]
         単位       = r["単位"]["value"]
 
@@ -293,20 +289,20 @@ async def sync_purchases_to_inventory() -> dict:
             continue
 
         try:
-            inv = await _get_inventory_by_code(品目コード)
+            inv = await _get_inventory_by_name(品目名)
 
             # App791 に存在しない場合、対象区分なら自動作成
             if not inv:
                 if 出金区分 in _AUTO_CREATE_区分:
-                    await _create_inventory_record(品目コード, 品目名, 出金区分, 班別, 単価, 単位)
+                    await _create_inventory_record(品目名, 出金区分, 班別, 単価, 単位)
                     created += 1
-                    inv = await _get_inventory_by_code(品目コード)
+                    inv = await _get_inventory_by_name(品目名)
                     if not inv:
-                        errors.append(f"品目コード '{品目コード}' の自動作成後に取得できませんでした")
+                        errors.append(f"品目名 '{品目名}' の自動作成後に取得できませんでした")
                         continue
                 else:
                     errors.append(
-                        f"品目コード '{品目コード}' がApp791に存在せず、出金区分 '{出金区分}' は自動作成対象外です"
+                        f"品目名 '{品目名}' がApp791に存在せず、出金区分 '{出金区分}' は自動作成対象外です"
                     )
                     continue
 
@@ -339,7 +335,7 @@ async def sync_purchases_to_inventory() -> dict:
             processed += 1
 
         except Exception as e:
-            errors.append(f"品目コード '{品目コード}': {e}")
+            errors.append(f"品目名 '{品目名}': {e}")
 
     return {
         "processed": processed,
@@ -371,17 +367,16 @@ async def get_purchase_suggestions() -> list[dict]:
     url = f"{_base()}/records.json"
     params = [
         ("app", APP_PURCHASE),
-        ("fields[0]",  "品目名"),
-        ("fields[1]",  "在庫品目コード"),
-        ("fields[2]",  "購入先"),
-        ("fields[3]",  "購入単価"),
-        ("fields[4]",  "何個入り"),
-        ("fields[5]",  "単位"),
-        ("fields[6]",  "課税対象"),
-        ("fields[7]",  "ドル単価"),
-        ("fields[8]",  "ドル円"),
-        ("fields[9]",  "出金区分"),
-        ("fields[10]", "購入数量"),
+        ("fields[0]", "品目名"),
+        ("fields[1]", "購入先"),
+        ("fields[2]", "購入単価"),
+        ("fields[3]", "何個入り"),
+        ("fields[4]", "単位"),
+        ("fields[5]", "課税対象"),
+        ("fields[6]", "ドル単価"),
+        ("fields[7]", "ドル円"),
+        ("fields[8]", "出金区分"),
+        ("fields[9]", "購入数量"),
         ("query", "order by 作成日時 desc limit 300"),
     ]
     async with httpx.AsyncClient(timeout=15) as client:
@@ -396,17 +391,16 @@ async def get_purchase_suggestions() -> list[dict]:
         if name and name not in seen:
             seen.add(name)
             suggestions.append({
-                "品目名":        name,
-                "在庫品目コード": r["在庫品目コード"]["value"],
-                "購入先":        r["購入先"]["value"],
-                "購入単価":      r["購入単価"]["value"] or "0",
-                "何個入り":      r["何個入り"]["value"] or "1",
-                "単位":          r["単位"]["value"],
-                "課税対象":      r["課税対象"]["value"],
-                "ドル単価":      r["ドル単価"]["value"] or "0",
-                "ドル円":        r["ドル円"]["value"] or "160",
-                "出金区分":      r["出金区分"]["value"],
-                "購入数量":      r["購入数量"]["value"] or "0",
+                "品目名":   name,
+                "購入先":   r["購入先"]["value"],
+                "購入単価": r["購入単価"]["value"] or "0",
+                "何個入り": r["何個入り"]["value"] or "1",
+                "単位":     r["単位"]["value"],
+                "課税対象": r["課税対象"]["value"],
+                "ドル単価": r["ドル単価"]["value"] or "0",
+                "ドル円":   r["ドル円"]["value"] or "160",
+                "出金区分": r["出金区分"]["value"],
+                "購入数量": r["購入数量"]["value"] or "0",
             })
     return suggestions
 
@@ -422,9 +416,8 @@ async def create_purchase_record(data: dict[str, Any]) -> dict:
         "対象年月":       {"value": 対象年月},
         "班":             {"value": data["班"]},
         "出金区分":       {"value": data["出金区分"]},
-        "品目名":         {"value": data["品目名"]},
-        "在庫品目コード": {"value": data.get("在庫品目コード", "")},
-        "購入先":         {"value": data.get("購入先", "")},
+        "品目名":  {"value": data["品目名"]},
+        "購入先":  {"value": data.get("購入先", "")},
         "課税対象":       {"value": data.get("課税対象", "国内")},
         "購入数量":       {"value": str(data.get("購入数量", ""))},
         "何個入り":       {"value": str(data.get("何個入り", 1))},
@@ -452,9 +445,8 @@ async def get_purchase_record(record_id: str) -> dict:
         resp.raise_for_status()
         r = resp.json()["record"]
     return {
-        "品目名":        r["品目名"]["value"],
-        "在庫品目コード": r["在庫品目コード"]["value"],
-        "班":            r["班"]["value"],
+        "品目名": r["品目名"]["value"],
+        "班":     r["班"]["value"],
         "出金区分":      r["出金区分"]["value"],
         "購入先":        r["購入先"]["value"],
         "課税対象":      r["課税対象"]["value"],
