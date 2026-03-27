@@ -611,28 +611,6 @@
     <div class="card">
       <div class="card-title">使用材料・消耗品の入力</div>
 
-      <!-- ファイルアップロードエリア（在庫使用タブ） -->
-      <div class="upload-area"
-        :class="{ 'drag-over': utDragOver }"
-        @dragover.prevent="utDragOver = true"
-        @dragleave.prevent="utDragOver = false"
-        @drop.prevent="utDragOver = false; utOnDrop($event)">
-        <input type="file" id="ut-file-input" style="display:none"
-          accept=".pdf,.jpg,.jpeg,.png,.webp,.xlsx,.xls,.txt"
-          @change="utOnFileChange($event)">
-        <label for="ut-file-input" class="upload-label">
-          📎
-          <span x-show="!utFileName" style="font-size:13px;color:#888;">使用材料の書類・写真をドロップ または クリックして選択（PDF/Excel/画像対応）</span>
-          <span x-show="utFileName" class="file-name-display" x-text="utFileName"></span>
-        </label>
-        <template x-if="utFileName">
-          <button class="btn btn-secondary btn-sm" @click="utFile=null;utFileName=''">✕ 削除</button>
-        </template>
-        <button class="btn btn-ai btn-sm" x-show="utFile" :disabled="utUploading" @click="utAnalyzeFile()">
-          <span x-show="utUploading"><span class="spinner"></span></span>
-          <span x-text="utUploading ? '解析中...' : '🤖 AIで読み込む'"></span>
-        </button>
-      </div>
 
       <!-- 共通ヘッダー情報 -->
       <div class="tbl-header-grid tbl-header-3">
