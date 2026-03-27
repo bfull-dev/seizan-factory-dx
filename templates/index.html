@@ -407,7 +407,7 @@
             <tr>
               <th style="width:110px;">出金区分<span class="req">*</span></th>
               <th style="min-width:160px;">品目名<span class="req">*</span></th>
-              <th style="width:100px;">在庫コード</th>
+              <th style="display:none;">在庫コード</th>
               <th style="width:105px;">課税</th>
               <th style="width:75px;">注文数</th>
               <th style="width:60px;">入数</th>
@@ -466,7 +466,7 @@
                   </div>
                 </td>
                 <!-- 在庫品目コード -->
-                <td><input type="text" :value="row.在庫品目コード" @input="row.在庫品目コード=$event.target.value" placeholder="任意"></td>
+                <td style="display:none;"><input type="text" :value="row.在庫品目コード" @input="row.在庫品目コード=$event.target.value" placeholder="任意"></td>
                 <!-- 課税対象 -->
                 <td>
                   <select :value="row.課税対象" @change="row.課税対象=$event.target.value; ptCalcRow(row)">
@@ -653,7 +653,7 @@
           <thead>
             <tr>
               <th style="min-width:160px;">品目名<span class="req">*</span></th>
-              <th style="width:110px;">品目コード</th>
+              <th style="display:none;">品目コード</th>
               <th style="width:100px;">用途区分</th>
               <th style="width:75px;">数量<span class="req">*</span></th>
               <th style="width:80px;">単価（円）</th>
@@ -703,7 +703,7 @@
                   </div>
                 </td>
                 <!-- 品目コード -->
-                <td><input type="text" :value="row.品目コード" @input="row.品目コード=$event.target.value" readonly placeholder="自動入力" style="background:#f8f9fa;color:#666;"></td>
+                <td style="display:none;"><input type="text" :value="row.品目コード" @input="row.品目コード=$event.target.value" readonly placeholder="自動入力" style="background:#f8f9fa;color:#666;"></td>
                 <!-- 用途区分 -->
                 <td>
                   <select :value="row.用途区分" @change="row.用途区分=$event.target.value">
@@ -1404,8 +1404,14 @@ function app() {
           }
         });
         this.showToast(data.count + '件登録しました', 'ok');
-        this.ptLoadHistory();
-        this.loadPurchaseSuggestions();
+        // 登録した日付の月に履歴セレクターを同期してから再取得
+        if (this.ptHeader.日付) {
+          const d = new Date(this.ptHeader.日付);
+          this.ptHistYear  = d.getFullYear();
+          this.ptHistMonth = d.getMonth() + 1;
+        }
+        await this.ptLoadHistory();
+        await this.loadPurchaseSuggestions();
       } catch(e) {
         this.showToast('エラー: ' + e.message, 'err');
       } finally { this.ptSubmitting = false; }
