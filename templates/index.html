@@ -467,10 +467,11 @@
                 <td>
                   <select :value="row.課税対象" @change="row.課税対象=$event.target.value; ptCalcRow(row)">
                     <option value="国内">国内</option>
-                    <option value="海外｜非課税">海外</option>
+                    <option value="海外">海外</option>
+                    <option value="非課税">非課税</option>
                   </select>
                   <!-- ドル単価・為替（海外の場合のみ表示） -->
-                  <div x-show="row.課税対象 === '海外｜非課税'" style="margin-top:4px; display:flex; flex-direction:column; gap:3px;">
+                  <div x-show="row.課税対象 === '海外'" style="margin-top:4px; display:flex; flex-direction:column; gap:3px;">
                     <div style="display:flex; align-items:center; gap:3px;">
                       <span style="font-size:11px; color:#555; white-space:nowrap; font-weight:bold;">$</span>
                       <input type="number" :value="row.ドル単価" @input="row.ドル単価=parseFloat($event.target.value)||0; ptCalcRow(row)" placeholder="請求単価" min="0" step="0.01" style="font-size:11px;">
@@ -496,10 +497,10 @@
                 </td>
                 <!-- 購入単価（海外は ドル単価×ドル円 で自動計算） -->
                 <td>
-                  <template x-if="row.課税対象 !== '海外｜非課税'">
+                  <template x-if="row.課税対象 !== '海外'">
                     <input type="number" :value="row.購入単価" @input="row.購入単価=$event.target.value; ptCalcRow(row)" min="0" step="1" placeholder="0">
                   </template>
-                  <template x-if="row.課税対象 === '海外｜非課税'">
+                  <template x-if="row.課税対象 === '海外'">
                     <input type="number" :value="row.購入単価" readonly style="background:#f0f4ff; color:#2980b9; font-weight:bold;" title="＄単価 × 為替レート">
                   </template>
                 </td>
@@ -1220,7 +1221,7 @@ function app() {
 
     ptCalcRow(row) {
       const qty  = parseFloat(row.購入数量) || 0;
-      const 海外 = row.課税対象 === '海外｜非課税';
+      const 海外 = row.課税対象 === '海外';
       if (海外) {
         // ドル単価 × 為替レート → 購入単価（円）を自動計算
         const usd = parseFloat(row.ドル単価) || 0;
@@ -1229,7 +1230,8 @@ function app() {
       }
       const 単価  = parseFloat(row.購入単価) || 0;
       row._税抜   = qty * 単価;
-      row._税込   = 海外 ? row._税抜 : Math.round(row._税抜 * 1.1);
+      // 国内のみ税込み＝税抜×1.1、海外・非課税は税込み＝税抜（同額）
+      row._税込   = row.課税対象 === '国内' ? Math.round(row._税抜 * 1.1) : row._税抜;
     },
 
     ptTotalTaxIn() {
