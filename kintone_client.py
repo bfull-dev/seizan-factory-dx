@@ -6,6 +6,8 @@ import base64
 import json
 import httpx
 from typing import Any
+from dotenv import load_dotenv
+load_dotenv()
 
 DOMAIN    = os.getenv("KINTONE_DOMAIN", "exk1223hafrf.cybozu.com")
 TOKEN_791 = os.getenv("KINTONE_TOKEN_791", "")
@@ -208,7 +210,7 @@ async def get_recent_usage(ym: str, limit: int = 20) -> list[dict]:
 # ─── 購入→在庫同期（App 794 → App 791）──────────────────────
 
 # App 791 自動作成の対象となる出金区分
-_AUTO_CREATE_区分 = {"樹脂", "変動費（製造用）", "製造用消耗品", "外注費"}
+_AUTO_CREATE_区分 = {"樹脂", "変動費（製造用）", "製造用消耗品"}
 
 
 async def _create_inventory_record(
@@ -218,6 +220,7 @@ async def _create_inventory_record(
     payload = {
         "app": APP_INVENTORY,
         "record": {
+            "品目コード":    {"value": 品目名},   # 必須フィールド（品目名と同値で運用）
             "品目名":        {"value": 品目名},
             "区分":          {"value": 区分},
             "班別":          {"value": 班別},
