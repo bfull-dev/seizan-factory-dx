@@ -1,5 +1,8 @@
 """Kintone REST API クライアント"""
 import os
+import io
+import base64
+import json
 import httpx
 from typing import Any
 
@@ -7,6 +10,9 @@ DOMAIN    = os.getenv("KINTONE_DOMAIN", "exk1223hafrf.cybozu.com")
 TOKEN_791 = os.getenv("KINTONE_TOKEN_791", "")
 TOKEN_792 = os.getenv("KINTONE_TOKEN_792", "")
 TOKEN_794 = os.getenv("KINTONE_TOKEN_794", "")
+
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GEMINI_MODEL   = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
 
 APP_INVENTORY = 791
 APP_USAGE     = 792   # 使用材料・消耗品入力（Webフォーム書き込み先）
@@ -451,6 +457,115 @@ async def get_purchase_record(record_id: str) -> dict:
         "ドル円":        r["ドル円"]["value"] or "160",
         "備考":          r["備考"]["value"],
     }
+
+
+_PURCHASE_PROMPT = """\
+この書類は日本の工場向け購入書類（請求書・見積書・納品書・メールなど）です。
+以下のJSON形式で品目情報を抽出してください。
+
+{
+  "vendor": "購入先企業名（不明なら空文字）",
+  "date": "YYYY-MM-DD形式の請求日または納品日（不明なら空文字）",
+  "currency": "JPY または USD",
+  "exchange_rate": 0,
+  "items": [
+    {
+      "品目名": "品目の名称",
+      "購入数量": 数値,
+      "何個入り": 1,
+      "単位": "個/枚/kg/L/式 など",
+      "購入単価": 税抜き単価（数値、不明なら0）,
+      "ドル単価": ドル建て単価（USD請求書のみ、それ以外は0）,
+      "課税対象": "国内" または "海外｜非課税",
+      "出金区分": "推測できる場合のみ。不明なら空文字",
+      "備考": "備考事項があれば記載"
+    }
+  ]
+}
+
+注意事項：
+- 税抜き単価を優先。税込み表記のみなら÷1.1で換算し備考に「税込換算」と記載
+- 海外・英語請求書ならcurrency=USD、課税対象=海外｜非課税
+- USD請求書の場合はexchange_rateに記載のレートを入れる（不明なら0）
+- 複数品目はすべて列挙すること
+- 必ずJSONのみを返すこと（余分な説明文不要）
+"""
+
+_USAGE_PROMPT = """\
+この書類は日本の工場で使用する材料・消耗品の使用記録・資料です。
+以下のJSON形式で使用品目を抽出してください。
+
+{
+  "items": [
+    {
+      "品目名": "品目名称",
+      "数量": 数値（不明なら0）,
+      "単位": "個/kg/L など",
+      "備考": "備考事項があれば"
+    }
+  ]
+}
+
+必ずJSONのみを返すこと。
+"""
+
+
+async def analyze_with_gemini(content: bytes, filename: str, analysis_type: str) -> dict:
+    """Gemini APIでファイルを解析し、品目リストとヘッダー情報を返す"""
+    fname = filename.lower()
+
+    # Excel → テキスト変換してテキストとして送信
+    if fname.endswith((".xlsx", ".xls")):
+        import openpyxl
+        wb = openpyxl.load_workbook(io.BytesIO(content), data_only=True)
+        lines: list[str] = []
+        for ws in wb.worksheets:
+            for row in ws.iter_rows(values_only=True):
+                line = "\t".join(str(c) if c is not None else "" for c in row)
+                if line.strip():
+                    lines.append(line)
+        text_content = "\n".join(lines)
+        prompt = (_PURCHASE_PROMPT if analysis_type == "purchase" else _USAGE_PROMPT)
+        parts = [{"text": prompt + "\n\n---以下が書類内容---\n" + text_content}]
+    else:
+        # PDF / 画像 / テキスト → base64でGeminiへ
+        b64 = base64.b64encode(content).decode()
+        if fname.endswith(".pdf"):
+            mime = "application/pdf"
+        elif fname.endswith(".png"):
+            mime = "image/png"
+        elif fname.endswith((".jpg", ".jpeg")):
+            mime = "image/jpeg"
+        elif fname.endswith(".webp"):
+            mime = "image/webp"
+        elif fname.endswith(".txt"):
+            mime = "text/plain"
+        else:
+            mime = "application/octet-stream"
+
+        prompt = (_PURCHASE_PROMPT if analysis_type == "purchase" else _USAGE_PROMPT)
+        if mime == "text/plain":
+            parts = [{"text": prompt + "\n\n---以下が書類内容---\n" + content.decode("utf-8", errors="replace")}]
+        else:
+            parts = [
+                {"text": prompt},
+                {"inline_data": {"mime_type": mime, "data": b64}},
+            ]
+
+    payload = {
+        "contents": [{"parts": parts}],
+        "generationConfig": {"response_mime_type": "application/json"},
+    }
+    url = (
+        f"https://generativelanguage.googleapis.com/v1beta/models/"
+        f"{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
+    )
+    async with httpx.AsyncClient(timeout=90) as client:
+        resp = await client.post(url, json=payload)
+        resp.raise_for_status()
+
+    raw = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+    return json.loads(raw)
 
 
 async def get_recent_purchases(ym: str, limit: int = 30) -> list[dict]:

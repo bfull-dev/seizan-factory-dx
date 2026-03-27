@@ -4,11 +4,12 @@ import subprocess
 import sys
 from datetime import date
 
-from fastapi import FastAPI, Request, HTTPException, BackgroundTasks
+from fastapi import FastAPI, Request, HTTPException, BackgroundTasks, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
+from typing import List
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -174,6 +175,68 @@ async def sync_inventory(background_tasks: BackgroundTasks):
 
     background_tasks.add_task(_run)
     return {"ok": True, "message": "在庫同期を開始しました（バックグラウンド処理）"}
+
+
+# ─── API: AI書類解析 ────────────────────────────────────────
+@app.post("/api/analyze-document")
+async def analyze_document(
+    file: UploadFile = File(...),
+    doc_type: str = Form(default="purchase"),  # "purchase" or "usage"
+):
+    """請求書・納品書等をGemini AIで解析し、品目リストを返す"""
+    try:
+        content = await file.read()
+        result = await kc.analyze_with_gemini(content, file.filename or "", doc_type)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ─── API: 購入レコード一括登録 ──────────────────────────────
+class PurchaseBulkIn(BaseModel):
+    header: dict  # 日付, 班, 購入先, 購入者
+    rows: List[PurchaseIn]
+
+
+@app.post("/api/purchases-bulk")
+async def create_purchases_bulk(body: PurchaseBulkIn, background_tasks: BackgroundTasks):
+    """複数の購入レコードを一括登録する"""
+    try:
+        results = []
+        for row in body.rows:
+            merged = {**body.header, **row.model_dump()}
+            result = await kc.create_purchase_record(merged)
+            results.append({"id": result.get("id")})
+        if any(r.在庫品目コード for r in body.rows):
+            async def _sync():
+                try:
+                    await kc.sync_purchases_to_inventory()
+                except Exception as e:
+                    print(f"[bulk-sync ERROR] {e}")
+            background_tasks.add_task(_sync)
+        return {"count": len(results), "results": results}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ─── API: 使用材料レコード一括登録 ──────────────────────────
+class UsageBulkIn(BaseModel):
+    header: dict  # 対象年月, 入力日, 班別
+    rows: List[UsageIn]
+
+
+@app.post("/api/usages-bulk")
+async def create_usages_bulk(body: UsageBulkIn):
+    """複数の使用材料レコードを一括登録し、在庫を減算する"""
+    try:
+        results = []
+        for row in body.rows:
+            merged = {**body.header, **row.model_dump()}
+            result = await kc.create_usage_record(merged)
+            results.append({"ok": True, "id": result.get("id")})
+        return {"count": len(results), "results": results}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ─── API: 月別サマリー即時集計 ──────────────────────────────
