@@ -25,15 +25,17 @@ load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env'))
 DOMAIN      = os.getenv("KINTONE_DOMAIN", "exk1223hafrf.cybozu.com")
 TOKEN_364   = os.getenv("KINTONE_TOKEN_364", "")
 TOKEN_723   = os.getenv("KINTONE_TOKEN_723", "")
+TOKEN_791   = os.getenv("KINTONE_TOKEN_791", "")   # 在庫リスト
 TOKEN_792   = os.getenv("KINTONE_TOKEN_792", "")   # 使用材料・消耗品入力（Webフォーム）
 TOKEN_794   = os.getenv("KINTONE_TOKEN_794", "")   # 出金管理
 TOKEN_793   = os.getenv("KINTONE_TOKEN_793", "")   # 月別サマリー
 
-APP_SHIPPING = 364
-APP_OEM      = 723
-APP_USAGE    = 792   # 使用材料・消耗品入力
-APP_EXPENSE  = 794   # 出金管理
-APP_SUMMARY  = 793
+APP_SHIPPING  = 364
+APP_OEM       = 723
+APP_INVENTORY = 791  # 在庫リスト
+APP_USAGE     = 792  # 使用材料・消耗品入力
+APP_EXPENSE   = 794  # 出金管理
+APP_SUMMARY   = 793
 
 BASE = f"https://{DOMAIN}/k/v1"
 
@@ -132,8 +134,10 @@ def aggregate_oem(ym: str) -> int:
 
 def aggregate_usage(ym: str) -> dict:
     """
-    App 792（使用材料・消耗品入力 Webフォーム）から製造原価を集計
-    入力種別='使用材料・消耗品' のレコードのみ対象
+    App 792（使用材料・消耗品入力）から製造原価を集計。
+    「数量 × App791移動平均単価」で計算することで、
+    暫定単価→確定単価の変更後も正確な製造原価が反映される。
+    TOKEN_791 未設定時は金額フィールドで代替。
     用途区分マッピング:
       樹脂                → 製造原価_樹脂
       変動費（製造用）    → 製造原価_変動費
@@ -151,20 +155,43 @@ def aggregate_usage(ym: str) -> dict:
         f'入力種別 in ("使用材料・消耗品")'
         f' and 入力日 >= "{d_from}" and 入力日 <= "{d_to}"'
     )
-    records = get_all_records(TOKEN_792, APP_USAGE, query, ["用途区分", "金額"])
+    変動費区分 = {"変動費（製造用）", "量産用材料", "量産用消耗品"}
+    対象区分   = {"樹脂"} | 変動費区分
+
+    # App791 移動平均単価マップを構築（1回のAPIで全件取得）
+    価格map: dict[str, float] = {}
+    if TOKEN_791:
+        inv_records = get_all_records(
+            TOKEN_791, APP_INVENTORY, '品目名 != ""', ["品目名", "移動平均単価"]
+        )
+        for inv in inv_records:
+            name  = inv["品目名"]["value"]
+            price = float(inv["移動平均単価"]["value"] or 0)
+            # 重複品目は移動平均単価が高いレコードを優先
+            if name not in 価格map or price > 価格map[name]:
+                価格map[name] = price
+        print(f"  App791 単価参照: {len(価格map)}品目")
+
+    # App792 の数量を取得し、移動平均単価で集計
+    records = get_all_records(TOKEN_792, APP_USAGE, query, ["用途区分", "品目名", "数量", "金額"])
 
     result = {"製造原価_樹脂": 0, "製造原価_変動費": 0}
-    # 変動費として集計する用途区分値（新旧両対応）
-    変動費区分 = {"変動費（製造用）", "量産用材料", "量産用消耗品"}
-
     for r in records:
-        cat = r["用途区分"]["value"]
-        amt = int(float(r["金額"]["value"] or 0))
+        cat  = r["用途区分"]["value"]
+        if cat not in 対象区分:
+            continue
+        name = r["品目名"]["value"]
+        qty  = float(r["数量"]["value"] or 0)
+        if 価格map and name in 価格map:
+            # 確定済み移動平均単価で計算
+            amt = int(qty * 価格map[name])
+        else:
+            # 単価マップにない場合は登録時金額で代替
+            amt = int(float(r["金額"]["value"] or 0))
         if cat == "樹脂":
             result["製造原価_樹脂"] += amt
         elif cat in 変動費区分:
             result["製造原価_変動費"] += amt
-        # 製造用備品・その他・空白 は集計対象外
 
     for k, v in result.items():
         print(f"  {k}: ¥{v:,}")
