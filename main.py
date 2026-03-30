@@ -140,6 +140,17 @@ async def create_purchase(body: PurchaseIn, background_tasks: BackgroundTasks):
                 except Exception as e:
                     print(f"[purchase-sync ERROR] {e}")
             background_tasks.add_task(_sync)
+        # サマリー自動再計算（暫定・確定問わず）
+        ym = body.日付[:7]  # "YYYY-MM-DD" → "YYYY-MM"
+        def _run_summary(target_ym: str):
+            try:
+                subprocess.run(
+                    [sys.executable, "scripts/update_monthly_summary.py", target_ym],
+                    capture_output=True, text=True, timeout=120
+                )
+            except Exception as e:
+                print(f"[purchase-create-summary ERROR] {e}")
+        background_tasks.add_task(_run_summary, ym)
         return {"id": result.get("id"), "revision": result.get("revision")}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -293,6 +304,20 @@ async def create_purchases_bulk(body: PurchaseBulkIn, background_tasks: Backgrou
                 except Exception as e:
                     print(f"[bulk-sync ERROR] {e}")
             background_tasks.add_task(_sync)
+        # サマリー自動再計算（暫定・確定問わず）
+        ym = body.header.get("日付", "")[:7]
+        if not ym and body.rows:
+            ym = body.rows[0].日付[:7]
+        if ym:
+            def _run_summary(target_ym: str):
+                try:
+                    subprocess.run(
+                        [sys.executable, "scripts/update_monthly_summary.py", target_ym],
+                        capture_output=True, text=True, timeout=120
+                    )
+                except Exception as e:
+                    print(f"[bulk-create-summary ERROR] {e}")
+            background_tasks.add_task(_run_summary, ym)
         return {"count": len(results), "results": results}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
