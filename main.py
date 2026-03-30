@@ -211,6 +211,50 @@ async def sync_inventory(background_tasks: BackgroundTasks):
     return {"ok": True, "message": "在庫同期を開始しました（バックグラウンド処理）"}
 
 
+# ─── API: 購入レコード更新時サマリー自動再計算（Kintone Webhook用）──
+@app.post("/api/sync-summary-on-update")
+async def sync_summary_on_update(request: Request, background_tasks: BackgroundTasks):
+    """
+    App794 レコード編集時にKintoneウェブフックから呼び出される。
+    ペイロードの日付フィールドから対象年月を取得し、月別サマリーを再計算する。
+    即座に 200 OK を返し、処理はバックグラウンドで実行する。
+    """
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    # Kintoneウェブフックペイロードから日付を取得
+    ym: str | None = None
+    try:
+        date_val = body.get("record", {}).get("日付", {}).get("value", "")
+        if date_val and len(date_val) >= 7:
+            ym = date_val[:7]  # "YYYY-MM-DD" → "YYYY-MM"
+    except Exception:
+        pass
+
+    if not ym:
+        # 日付が取れない場合は今月で実行
+        from datetime import date
+        ym = date.today().strftime("%Y-%m")
+
+    def _run_summary(target_ym: str):
+        try:
+            result = subprocess.run(
+                [sys.executable, "scripts/update_monthly_summary.py", target_ym],
+                capture_output=True, text=True, timeout=120
+            )
+            if result.returncode != 0:
+                print(f"[sync-summary-on-update ERROR] {result.stderr or result.stdout}")
+            else:
+                print(f"[sync-summary-on-update] {target_ym} 完了")
+        except Exception as e:
+            print(f"[sync-summary-on-update ERROR] {e}")
+
+    background_tasks.add_task(_run_summary, ym)
+    return {"ok": True, "ym": ym, "message": f"{ym} のサマリー再計算を開始しました"}
+
+
 # ─── API: AI書類解析 ────────────────────────────────────────
 @app.post("/api/analyze-document")
 async def analyze_document(
