@@ -449,8 +449,9 @@ async def create_purchase_record(data: dict[str, Any]) -> dict:
         "単位":           {"value": data.get("単位", "式")},
         "購入単価":       {"value": str(data.get("購入単価", ""))},
         "備考":           {"value": data.get("備考", "")},
+        "暫定":           {"value": ["暫定"] if data.get("暫定") else []},
     }
-    if data.get("課税対象") == "海外｜非課税":
+    if data.get("課税対象") == "海外":
         record["ドル単価"] = {"value": str(data.get("ドル単価", ""))}
         record["ドル円"]   = {"value": str(data.get("ドル円", "160"))}
 
@@ -483,6 +484,30 @@ async def get_purchase_record(record_id: str) -> dict:
         "ドル円":        r["ドル円"]["value"] or "160",
         "備考":          r["備考"]["value"],
     }
+
+
+async def update_purchase_record(record_id: str, data: dict) -> dict:
+    """App 794 の既存購入レコードを更新する（暫定→確定フロー）"""
+    url = f"{_base()}/record.json"
+    record: dict[str, Any] = {
+        "購入単価": {"value": str(data.get("購入単価", ""))},
+        "購入数量": {"value": str(data.get("購入数量", ""))},
+        "何個入り": {"value": str(data.get("何個入り", 1))},
+        "備考":     {"value": data.get("備考", "")},
+        "暫定":     {"value": ["暫定"] if data.get("暫定") else []},
+    }
+    if data.get("ドル単価"):
+        record["ドル単価"] = {"value": str(data["ドル単価"])}
+    if data.get("ドル円"):
+        record["ドル円"] = {"value": str(data["ドル円"])}
+    payload = {"app": APP_PURCHASE, "id": record_id, "record": record}
+    async with httpx.AsyncClient(timeout=10) as client:
+        resp = await client.put(
+            f"{_base()}/record.json", json=payload,
+            headers=_post_headers(TOKEN_794)
+        )
+        resp.raise_for_status()
+        return resp.json()
 
 
 _PURCHASE_PROMPT = """\
@@ -605,15 +630,22 @@ async def get_recent_purchases(ym: str, limit: int = 30) -> list[dict]:
     )
     params = [
         ("app", APP_PURCHASE),
-        ("fields[0]", "レコード番号"),
-        ("fields[1]", "日付"),
-        ("fields[2]", "班"),
-        ("fields[3]", "品目名"),
-        ("fields[4]", "出金区分"),
-        ("fields[5]", "購入数量"),
-        ("fields[6]", "何個入り"),
-        ("fields[7]", "税込み額"),
-        ("fields[8]", "在庫反映状況"),
+        ("fields[0]",  "レコード番号"),
+        ("fields[1]",  "日付"),
+        ("fields[2]",  "班"),
+        ("fields[3]",  "品目名"),
+        ("fields[4]",  "出金区分"),
+        ("fields[5]",  "購入数量"),
+        ("fields[6]",  "何個入り"),
+        ("fields[7]",  "税込み額"),
+        ("fields[8]",  "在庫反映状況"),
+        ("fields[9]",  "購入単価"),
+        ("fields[10]", "ドル単価"),
+        ("fields[11]", "ドル円"),
+        ("fields[12]", "対象年月"),
+        ("fields[13]", "課税対象"),
+        ("fields[14]", "備考"),
+        ("fields[15]", "暫定"),
         ("query", query),
     ]
     async with httpx.AsyncClient(timeout=10) as client:
@@ -632,6 +664,13 @@ async def get_recent_purchases(ym: str, limit: int = 30) -> list[dict]:
             "何個入り":      r["何個入り"]["value"],
             "税込み額":      r["税込み額"]["value"],
             "在庫反映状況":  r["在庫反映状況"]["value"],
+            "購入単価":      r["購入単価"]["value"] or "0",
+            "ドル単価":      r["ドル単価"]["value"] or "0",
+            "ドル円":        r["ドル円"]["value"] or "160",
+            "対象年月":      r["対象年月"]["value"],
+            "課税対象":      r["課税対象"]["value"],
+            "備考":          r["備考"]["value"],
+            "暫定":          bool(r["暫定"]["value"]),
         }
         for r in records
     ]

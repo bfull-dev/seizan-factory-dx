@@ -114,6 +114,18 @@ class PurchaseIn(BaseModel):
     ドル単価:       float = 0
     ドル円:         float = 160
     備考:           str = ""
+    暫定:           bool = False
+
+
+class PurchaseUpdateIn(BaseModel):
+    購入単価:   float = Field(ge=0)
+    購入数量:   float = Field(ge=0)
+    何個入り:   float = Field(ge=1, default=1)
+    ドル単価:   float = 0
+    ドル円:     float = 160
+    備考:       str = ""
+    暫定:       bool = False
+    対象年月:   str = ""  # サマリー自動再計算用
 
 
 @app.post("/api/purchase")
@@ -138,7 +150,8 @@ async def create_purchase(body: PurchaseIn, background_tasks: BackgroundTasks):
 async def purchase_history(ym: str):
     try:
         records = await kc.get_recent_purchases(ym)
-        return {"records": records}
+        has_provisional = any(r.get("暫定") for r in records)
+        return {"records": records, "has_provisional": has_provisional}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -149,6 +162,23 @@ async def get_usage(record_id: str):
     try:
         data = await kc.get_usage_record(record_id)
         return data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ─── API: 購入レコード更新（暫定→確定） ────────────────────
+@app.put("/api/purchase/{record_id}")
+async def update_purchase(record_id: str, body: PurchaseUpdateIn, background_tasks: BackgroundTasks):
+    try:
+        await kc.update_purchase_record(record_id, body.model_dump())
+        if body.対象年月:
+            def _run():
+                subprocess.run(
+                    [sys.executable, "scripts/update_monthly_summary.py", body.対象年月],
+                    capture_output=True, text=True, timeout=120
+                )
+            background_tasks.add_task(_run)
+        return {"ok": True}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

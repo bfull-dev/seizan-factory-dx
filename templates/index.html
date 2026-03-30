@@ -140,6 +140,7 @@
       border-color: #3498db; outline: none;
     }
     .input-table .td-del { width: 32px; text-align: center; padding-top: 7px; }
+    .input-table tr.provisional-row { background: #fef9f0; }
     .input-table .td-act { width: 72px; text-align: center; padding-top: 5px; }
     .input-table .td-status { width: 64px; text-align: center; padding-top: 7px; font-size: 11px; }
     .input-table .td-calc { width: 90px; text-align: right; font-size: 12px; color: #555; padding: 7px 6px; white-space: nowrap; vertical-align: middle; }
@@ -319,6 +320,50 @@
   </div>
 </div>
 
+<!-- 暫定レコード編集モーダル -->
+<div class="stock-overlay" x-show="ptEditModal.show" x-cloak @click.self="ptEditModal.show=false">
+  <div class="stock-modal" style="max-width:440px;text-align:left;">
+    <div class="stock-modal-title" style="color:#e67e22;">⚠ 暫定レコードの確定・更新</div>
+    <p style="font-size:13px;color:#555;margin-bottom:14px;">
+      品目名: <strong x-text="ptEditModal.品目名"></strong>
+    </p>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px;">
+      <div>
+        <label style="font-size:11px;color:#888;display:block;margin-bottom:2px;">単価（円）</label>
+        <input type="number" x-model.number="ptEditModal.購入単価" min="0" step="1"
+          style="width:100%;padding:6px;border:1px solid #ccc;border-radius:4px;font-size:13px;">
+      </div>
+      <div>
+        <label style="font-size:11px;color:#888;display:block;margin-bottom:2px;">注文数</label>
+        <input type="number" x-model.number="ptEditModal.購入数量" min="0" step="any"
+          style="width:100%;padding:6px;border:1px solid #ccc;border-radius:4px;font-size:13px;">
+      </div>
+      <div>
+        <label style="font-size:11px;color:#888;display:block;margin-bottom:2px;">入数</label>
+        <input type="number" x-model.number="ptEditModal.何個入り" min="1" step="1"
+          style="width:100%;padding:6px;border:1px solid #ccc;border-radius:4px;font-size:13px;">
+      </div>
+    </div>
+    <div style="margin-bottom:10px;">
+      <label style="font-size:11px;color:#888;display:block;margin-bottom:2px;">備考</label>
+      <input type="text" x-model="ptEditModal.備考" placeholder="任意"
+        style="width:100%;padding:6px;border:1px solid #ccc;border-radius:4px;font-size:13px;box-sizing:border-box;">
+    </div>
+    <div style="margin-bottom:18px;">
+      <label style="cursor:pointer;font-size:13px;display:flex;align-items:center;gap:6px;">
+        <input type="checkbox" x-model="ptEditModal.暫定" style="width:15px;height:15px;">
+        <span>暫定のまま保存する（チェックを外すと確定済みになります）</span>
+      </label>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <button class="btn btn-secondary" @click="ptEditModal.show=false">キャンセル</button>
+      <button class="btn btn-orange" @click="ptSaveEdit()" :disabled="ptEditSaving">
+        <span x-text="ptEditSaving ? '更新中...' : '確定して更新'"></span>
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- ヘッダー -->
 <div class="header">
   <div class="header-inner">
@@ -415,13 +460,14 @@
               <th style="width:88px;">税抜き額</th>
               <th style="width:88px;">税込み額</th>
               <th style="min-width:100px;">備考</th>
+              <th style="width:46px;text-align:center;">暫定</th>
               <th style="width:32px;"></th>
               <th style="width:64px;">状態</th>
             </tr>
           </thead>
           <tbody>
             <template x-for="(row, ri) in ptRows" :key="ri">
-              <tr>
+              <tr :class="{'provisional-row': row.暫定}">
                 <!-- 出金区分 -->
                 <td>
                   <select :value="row.出金区分" @change="row.出金区分 = $event.target.value">
@@ -510,6 +556,13 @@
                 <td class="td-calc" style="color:#c0392b;font-weight:bold;" x-text="'¥' + (row._税込||0).toLocaleString()"></td>
                 <!-- 備考 -->
                 <td><input type="text" :value="row.備考" @input="row.備考=$event.target.value" placeholder="任意"></td>
+                <!-- 暫定 -->
+                <td style="text-align:center;">
+                  <label style="cursor:pointer;font-size:11px;display:flex;flex-direction:column;align-items:center;gap:2px;">
+                    <input type="checkbox" x-model="row.暫定" style="width:14px;height:14px;">
+                    <span :style="row.暫定 ? 'color:#e67e22;font-weight:bold;' : 'color:#aaa;'">暫定</span>
+                  </label>
+                </td>
                 <!-- 削除 -->
                 <td class="td-del">
                   <button class="del-btn" @click="ptRows.splice(ri, 1)" title="この行を削除">×</button>
@@ -544,9 +597,12 @@
     <!-- 購入履歴 -->
     <div class="card">
       <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;">
-        <span>購入履歴
-          <span style="font-weight:normal;font-size:12px;color:#888;margin-left:8px;"
+        <span style="display:flex;align-items:center;gap:8px;">
+          購入履歴
+          <span style="font-weight:normal;font-size:12px;color:#888;"
             x-text="ptHistYear + '年' + ptHistMonth + '月'"></span>
+          <span x-show="ptHasProvisional"
+            style="background:#f39c12;color:#fff;font-size:10px;padding:2px 7px;border-radius:3px;font-weight:bold;">⚠ 暫定データ含む</span>
         </span>
         <div style="display:flex;gap:8px;align-items:center;">
           <select x-model="ptHistYear" style="width:auto;font-size:12px;padding:4px 6px;" @change="ptLoadHistory()">
@@ -573,7 +629,7 @@
               <tr>
                 <th>日付</th><th>班</th><th>品目名</th><th>出金区分</th>
                 <th class="num">注文数</th><th class="num">入数</th>
-                <th class="num">税込み額</th><th>反映</th>
+                <th class="num">税込み額</th><th>反映</th><th>状態</th>
               </tr>
             </thead>
             <tbody>
@@ -591,6 +647,15 @@
                       :class="r.在庫反映状況 === '反映済' ? 'badge-done' : 'badge-pending'"
                       x-text="r.在庫反映状況 || '未処理'">
                     </span>
+                  </td>
+                  <td style="text-align:center;white-space:nowrap;">
+                    <template x-if="r.暫定">
+                      <span style="display:inline-flex;align-items:center;gap:4px;">
+                        <span style="background:#f39c12;color:#fff;font-size:10px;padding:2px 5px;border-radius:3px;font-weight:bold;">⚠ 暫定</span>
+                        <button @click="ptOpenEdit(r)"
+                          style="background:#e67e22;color:#fff;border:none;border-radius:3px;padding:2px 6px;font-size:10px;cursor:pointer;">編集</button>
+                      </span>
+                    </template>
                   </td>
                 </tr>
               </template>
@@ -1201,12 +1266,15 @@ function app() {
     ptHistMonth: {{ current_month }},
     pHistory: [],
     pSuggestions: [],
+    ptHasProvisional: false,
+    ptEditModal: { show: false, 品目名: '', レコード番号: '', 購入単価: 0, 購入数量: 0, 何個入り: 1, ドル単価: 0, ドル円: 160, 備考: '', 暫定: false, 対象年月: '' },
+    ptEditSaving: false,
 
     ptDefaultRow() {
       return {
         出金区分: '', 品目名: '', 課税対象: '国内',
         購入数量: '', 何個入り: 1, 単位: '式', 購入単価: '',
-        ドル単価: 0, ドル円: this.usdJpy, 備考: '',
+        ドル単価: 0, ドル円: this.usdJpy, 備考: '', 暫定: false,
         _税抜: 0, _税込: 0, _status: '',
         _acItems: [], _acIndex: -1, _acTop: 0, _acLeft: 0, _acWidth: 280,
       };
@@ -1295,7 +1363,51 @@ function app() {
         const res  = await fetch('/api/purchase-history?ym=' + encodeURIComponent(ym));
         const data = await res.json();
         this.pHistory = data.records || [];
+        this.ptHasProvisional = data.has_provisional || false;
       } catch(e) { console.error('購入履歴取得エラー', e); }
+    },
+
+    ptOpenEdit(r) {
+      this.ptEditModal = {
+        show: true,
+        品目名:     r.品目名,
+        レコード番号: r.レコード番号,
+        購入単価:   Number(r.購入単価) || 0,
+        購入数量:   Number(r.購入数量) || 0,
+        何個入り:   Number(r.何個入り) || 1,
+        ドル単価:   Number(r.ドル単価) || 0,
+        ドル円:     Number(r.ドル円) || 160,
+        備考:       r.備考 || '',
+        暫定:       r.暫定 || false,
+        対象年月:   r.対象年月 || '',
+      };
+    },
+
+    async ptSaveEdit() {
+      this.ptEditSaving = true;
+      try {
+        const res = await fetch('/api/purchase/' + this.ptEditModal.レコード番号, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            購入単価: this.ptEditModal.購入単価,
+            購入数量: this.ptEditModal.購入数量,
+            何個入り: this.ptEditModal.何個入り,
+            ドル単価: this.ptEditModal.ドル単価,
+            ドル円:   this.ptEditModal.ドル円,
+            備考:     this.ptEditModal.備考,
+            暫定:     this.ptEditModal.暫定,
+            対象年月: this.ptEditModal.対象年月,
+          }),
+        });
+        if (!res.ok) { const err = await res.json(); throw new Error(err.detail || '更新失敗'); }
+        this.ptEditModal.show = false;
+        this.showToast('更新しました。サマリーを再計算中...', 'ok');
+        await new Promise(r => setTimeout(r, 800));
+        await this.ptLoadHistory();
+      } catch(e) {
+        this.showToast('エラー: ' + e.message, 'err');
+      } finally { this.ptEditSaving = false; }
     },
 
     // ── ファイルアップロード（購入） ──
@@ -1377,6 +1489,7 @@ function app() {
           ドル単価: parseFloat(r.ドル単価)||0,
           ドル円:   parseFloat(r.ドル円)||160,
           備考: r.備考 || '',
+          暫定: r.暫定 || false,
         })),
       };
       try {
