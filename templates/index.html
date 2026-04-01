@@ -1299,7 +1299,7 @@ function app() {
       const 単価  = parseFloat(row.購入単価) || 0;
       row._税抜   = qty * 単価;
       // 国内のみ税込み＝税抜×1.1、海外・非課税は税込み＝税抜（同額）
-      row._税込   = row.課税対象 === '国内' ? Math.round(row._税抜 * 1.1) : row._税抜;
+      row._税込   = row.課税対象 === '国内' ? Math.floor(row._税抜 * 1.1) : row._税抜;
     },
 
     ptTotalTaxIn() {
