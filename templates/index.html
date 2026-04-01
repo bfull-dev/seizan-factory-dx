@@ -404,11 +404,11 @@
         @dragleave.prevent="ptDragOver = false"
         @drop.prevent="ptDragOver = false; ptOnDrop($event)">
         <input type="file" id="pt-file-input" style="display:none"
-          accept=".pdf,.jpg,.jpeg,.png,.webp,.xlsx,.xls,.txt"
+          accept=".pdf,.jpg,.jpeg,.png,.webp,.txt"
           @change="ptOnFileChange($event)">
         <label for="pt-file-input" class="upload-label">
           📎
-          <span x-show="!ptFileName" style="font-size:13px;color:#888;">請求書・納品書・見積書をここにドロップ または クリックして選択（PDF/Excel/画像対応）</span>
+          <span x-show="!ptFileName" style="font-size:13px;color:#888;">請求書・納品書・見積書をここにドロップ または クリックして選択（PDF/画像対応）</span>
           <span x-show="ptFileName" class="file-name-display" x-text="ptFileName"></span>
         </label>
         <template x-if="ptFileName">
@@ -1458,6 +1458,12 @@ function app() {
           const existing = this.ptRows.filter(r => (r.品目名||'').trim() || r._status);
           this.ptRows = [...existing, ...newRows];
           this.showToast(`AI解析完了: ${newRows.length}件の品目を追加しました`, 'ok');
+          // 警告がある場合は少し遅らせて続けて表示
+          if (data._warnings && data._warnings.length > 0) {
+            setTimeout(() => {
+              data._warnings.forEach(w => this.showToast(w, 'err'));
+            }, 1000);
+          }
         } else {
           this.showToast('品目が見つかりませんでした。手動で入力してください', 'err');
         }

@@ -515,7 +515,7 @@ _PURCHASE_PROMPT = """\
 以下のJSON形式で品目情報を抽出してください。
 
 {
-  "vendor": "購入先企業名（不明なら空文字）",
+  "vendor": "請求元の会社名（この書類を発行した売り手・販売者の名称）。「御中」と書かれた請求先（買い手・自社）ではない",
   "date": "YYYY-MM-DD形式の請求日または納品日（不明なら空文字）",
   "currency": "JPY または USD",
   "exchange_rate": 0,
@@ -539,6 +539,9 @@ _PURCHASE_PROMPT = """\
 - 海外・英語請求書ならcurrency=USD、課税対象=海外｜非課税
 - USD請求書の場合はexchange_rateに記載のレートを入れる（不明なら0）
 - 複数品目はすべて列挙すること
+- 送料・配送料・運賃・freight・shipping などは必ず品目として抽出すること（小計・合計・subtotalの後に記載されていても見落とさない）
+- 手数料・梱包料・その他費用も同様に品目として抽出すること
+- 請求元（売り手）は書類の右上や下部・発行者欄に記載されることが多い。「御中」宛ての請求先（買い手）と混同しないこと
 - 必ずJSONのみを返すこと（余分な説明文不要）
 """
 
@@ -559,6 +562,21 @@ _USAGE_PROMPT = """\
 
 必ずJSONのみを返すこと。
 """
+
+
+def _validate_purchase_result(result: dict) -> dict:
+    """AI抽出結果に対してサニティチェックを行い、警告を付与する"""
+    shipping_keywords = ["送料", "配送", "運賃", "freight", "shipping"]
+    has_shipping_item = any(
+        any(kw in (item.get("品目名") or "").lower() for kw in shipping_keywords)
+        for item in result.get("items", [])
+    )
+    result["_warnings"] = []
+    if not has_shipping_item:
+        result["_warnings"].append(
+            "⚠️ 送料品目が見つかりませんでした。書類に送料の記載がある場合はご確認ください。"
+        )
+    return result
 
 
 async def analyze_with_gemini(content: bytes, filename: str, analysis_type: str) -> dict:
@@ -616,7 +634,10 @@ async def analyze_with_gemini(content: bytes, filename: str, analysis_type: str)
         resp.raise_for_status()
 
     raw = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
-    return json.loads(raw)
+    result = json.loads(raw)
+    if analysis_type == "purchase":
+        result = _validate_purchase_result(result)
+    return result
 
 
 async def get_recent_purchases(ym: str, limit: int = 30) -> list[dict]:
