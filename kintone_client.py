@@ -640,7 +640,7 @@ async def analyze_with_gemini(content: bytes, filename: str, analysis_type: str)
     return result
 
 
-async def get_recent_purchases(ym: str, limit: int = 30) -> list[dict]:
+async def get_recent_purchases(ym: str, limit: int = 500) -> list[dict]:
     """App 794 の直近購入履歴を取得する"""
     url = f"{_base()}/records.json"
     # ym は "YYYY/MM" 形式
