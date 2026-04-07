@@ -511,11 +511,18 @@
                 </td>
                 <!-- 課税対象 -->
                 <td>
-                  <select :value="row.課税対象" @change="row.課税対象=$event.target.value; ptCalcRow(row)">
+                  <select :value="row.課税対象" @change="row.課税対象=$event.target.value; row.内税=false; ptCalcRow(row)">
                     <option value="国内">国内</option>
                     <option value="海外">海外</option>
                     <option value="非課税">非課税</option>
                   </select>
+                  <!-- 内税チェックボックス（国内のみ） -->
+                  <div x-show="row.課税対象 === '国内'" style="margin-top:3px;">
+                    <label style="font-size:11px;color:#555;cursor:pointer;display:flex;align-items:center;gap:3px;">
+                      <input type="checkbox" x-model="row.内税" @change="ptCalcRow(row)" style="width:12px;height:12px;">
+                      <span :style="row.内税 ? 'color:#c0392b;font-weight:bold;' : ''">内税入力</span>
+                    </label>
+                  </div>
                   <!-- ドル単価・為替（海外の場合のみ表示） -->
                   <div x-show="row.課税対象 === '海外'" style="margin-top:4px; display:flex; flex-direction:column; gap:3px;">
                     <div style="display:flex; align-items:center; gap:3px;">
@@ -1272,7 +1279,7 @@ function app() {
 
     ptDefaultRow() {
       return {
-        出金区分: '', 品目名: '', 課税対象: '国内',
+        出金区分: '', 品目名: '', 課税対象: '国内', 内税: false,
         購入数量: '', 何個入り: 1, 単位: '式', 購入単価: '',
         ドル単価: 0, ドル円: this.usdJpy, 備考: '', 暫定: false,
         _税抜: 0, _税込: 0, _status: '',
@@ -1296,10 +1303,16 @@ function app() {
         const fx  = parseFloat(row.ドル円)   || 1;
         row.購入単価 = Math.round(usd * fx);
       }
-      const 単価  = parseFloat(row.購入単価) || 0;
-      row._税抜   = qty * 単価;
-      // 国内のみ税込み＝税抜×1.1、海外・非課税は税込み＝税抜（同額）
-      row._税込   = row.課税対象 === '国内' ? Math.floor(row._税抜 * 1.1) : row._税抜;
+      const 単価 = parseFloat(row.購入単価) || 0;
+      if (row.課税対象 === '国内' && row.内税) {
+        // 内税：入力値が税込 → 税抜 = floor(税込 ÷ 1.1)
+        row._税込 = qty * 単価;
+        row._税抜 = Math.floor(row._税込 / 1.1);
+      } else {
+        // 通常：入力値が税抜
+        row._税抜 = qty * 単価;
+        row._税込 = row.課税対象 === '国内' ? Math.floor(row._税抜 * 1.1) : row._税抜;
+      }
     },
 
     ptTotalTaxIn() {
@@ -1447,6 +1460,7 @@ function app() {
             row.何個入り     = item.何個入り || 1;
             row.単位         = item.単位 || '式';
             row.購入単価     = item.購入単価 || 0;
+            row.内税         = (item.内税 === true && (item.課税対象 || '国内') === '国内');
             row.ドル単価     = item.ドル単価 || 0;
             row.ドル円       = exchRate;
             row.課税対象     = item.課税対象 || '国内';
@@ -1484,19 +1498,24 @@ function app() {
           日付: this.ptHeader.日付, 班: this.ptHeader.班,
           購入先: this.ptHeader.購入先, 購入者: this.ptHeader.購入者,
         },
-        rows: validRows.map(r => ({
-          日付: this.ptHeader.日付, 班: this.ptHeader.班, 出金区分: r.出金区分,
-          品目名: r.品目名.trim(),
-          購入先: this.ptHeader.購入先 || '', 課税対象: r.課税対象 || '国内',
-          購入数量: parseFloat(r.購入数量)||0,
-          何個入り: parseFloat(r.何個入り)||1,
-          単位: r.単位 || '式',
-          購入単価: parseFloat(r.購入単価)||0,
-          ドル単価: parseFloat(r.ドル単価)||0,
-          ドル円:   parseFloat(r.ドル円)||160,
-          備考: r.備考 || '',
-          暫定: r.暫定 || false,
-        })),
+        rows: validRows.map(r => {
+          // 内税チェック時：購入単価（税込入力）→ 税抜単価に変換してKintoneへ保存
+          const 単価 = parseFloat(r.購入単価) || 0;
+          const 保存単価 = (r.課税対象 === '国内' && r.内税) ? Math.floor(単価 / 1.1) : 単価;
+          return {
+            日付: this.ptHeader.日付, 班: this.ptHeader.班, 出金区分: r.出金区分,
+            品目名: r.品目名.trim(),
+            購入先: this.ptHeader.購入先 || '', 課税対象: r.課税対象 || '国内',
+            購入数量: parseFloat(r.購入数量)||0,
+            何個入り: parseFloat(r.何個入り)||1,
+            単位: r.単位 || '式',
+            購入単価: 保存単価,
+            ドル単価: parseFloat(r.ドル単価)||0,
+            ドル円:   parseFloat(r.ドル円)||160,
+            備考: r.備考 || '',
+            暫定: r.暫定 || false,
+          };
+        }),
       };
       try {
         const res = await fetch('/api/purchases-bulk', {
