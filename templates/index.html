@@ -768,7 +768,7 @@
                     <option value="">--</option>
                     <option>樹脂</option>
                     <option>変動費（製造用）</option>
-                    <option>製造用備品</option>
+                    <option>製造用消耗品</option>
                     <option>その他</option>
                   </select>
                 </td>
@@ -1513,16 +1513,21 @@ function app() {
           }
         });
         this.showToast(data.count + '件登録しました', 'ok');
-        // 登録した日付の月に履歴セレクターを同期してから再取得
+        // 登録した日付の月に履歴セレクターを同期
         if (this.ptHeader.日付) {
           const d = new Date(this.ptHeader.日付);
           this.ptHistYear  = d.getFullYear();
           this.ptHistMonth = d.getMonth() + 1;
         }
-        // Kintone への書き込み反映待ち（500ms）後に履歴・サジェスト更新
-        await new Promise(r => setTimeout(r, 500));
-        await this.ptLoadHistory();
-        await this.loadPurchaseSuggestions();
+        // 入力行を即リセット（二重登録防止）
+        this.ptResetRows();
+        // Kintone への書き込み反映待ち（1500ms）後に全データ更新
+        await new Promise(r => setTimeout(r, 1500));
+        await Promise.all([
+          this.ptLoadHistory(),
+          this.loadInventory(),
+          this.loadPurchaseSuggestions(),
+        ]);
       } catch(e) {
         this.showToast('エラー: ' + e.message, 'err');
       } finally { this.ptSubmitting = false; }

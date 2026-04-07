@@ -131,7 +131,7 @@ class PurchaseUpdateIn(BaseModel):
 @app.post("/api/purchase")
 async def create_purchase(body: PurchaseIn, background_tasks: BackgroundTasks):
     try:
-        _SYNC_区分 = {"樹脂", "変動費（製造用）"}
+        _SYNC_区分 = {"樹脂", "変動費（製造用）", "製造用消耗品"}
         result = await kc.create_purchase_record(body.model_dump())
         if body.出金区分 in _SYNC_区分:
             async def _sync():
@@ -296,7 +296,7 @@ async def create_purchases_bulk(body: PurchaseBulkIn, background_tasks: Backgrou
             merged = {**body.header, **row.model_dump()}
             result = await kc.create_purchase_record(merged)
             results.append({"id": result.get("id")})
-        _SYNC_区分 = {"樹脂", "変動費（製造用）"}
+        _SYNC_区分 = {"樹脂", "変動費（製造用）", "製造用消耗品"}
         if any(r.出金区分 in _SYNC_区分 for r in body.rows):
             async def _sync():
                 try:

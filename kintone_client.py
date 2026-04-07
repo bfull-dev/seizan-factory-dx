@@ -218,7 +218,7 @@ async def get_recent_usage(ym: str, limit: int = 20) -> list[dict]:
 # ─── 購入→在庫同期（App 794 → App 791）──────────────────────
 
 # App 791 自動作成の対象となる出金区分
-_AUTO_CREATE_区分 = {"樹脂", "変動費（製造用）"}
+_AUTO_CREATE_区分 = {"樹脂", "変動費（製造用）", "製造用消耗品"}
 
 
 async def _create_inventory_record(
@@ -270,7 +270,7 @@ async def _sync_purchases_to_inventory_inner() -> dict:
         ("app", APP_PURCHASE),
         ("query", (
             '品目名 != "" and 在庫反映状況 not in ("反映済") '
-            'and 出金区分 in ("樹脂", "変動費（製造用）") '
+            'and 出金区分 in ("樹脂", "変動費（製造用）", "製造用消耗品") '
             'order by 日付 asc limit 100'
         )),
         ("fields[0]", "レコード番号"),
@@ -746,13 +746,14 @@ async def get_monthly_summary(ym: str) -> dict | None:
 
 
 # 変動費として扱う用途区分（App 792）
-_変動費区分 = {"変動費（製造用）", "量産用材料", "量産用消耗品"}
+_変動費区分 = {"変動費（製造用）", "量産用材料", "量産用消耗品", "製造用消耗品"}
 
 
 async def get_manufacturing_cost_details(ym: str) -> dict:
     """
-    App 792（使用材料: 樹脂・変動費）と App 794（出金管理: 製造用備品・外注費・製造用消耗品）
+    App 792（使用材料: 樹脂・変動費・製造用消耗品）と App 794（出金管理: 製造用備品・外注費）
     から対象月の明細を取得し、カテゴリ別に返す。
+    ※製造用消耗品は在庫化のため App 792 側（用途区分）で集計する。
     """
     params_792 = [
         ("app", APP_USAGE),
@@ -767,7 +768,7 @@ async def get_manufacturing_cost_details(ym: str) -> dict:
     ]
     params_794 = [
         ("app", APP_PURCHASE),
-        ("query", f'対象年月 = "{ym}" and 出金区分 in ("製造用備品", "外注費", "製造用消耗品") order by 日付 asc limit 500'),
+        ("query", f'対象年月 = "{ym}" and 出金区分 in ("製造用備品", "外注費") order by 日付 asc limit 500'),
         ("fields[0]", "日付"),
         ("fields[1]", "班"),
         ("fields[2]", "品目名"),
@@ -786,7 +787,7 @@ async def get_manufacturing_cost_details(ym: str) -> dict:
         r794.raise_for_status()
 
     result: dict[str, list] = {
-        "樹脂": [], "変動費": [], "製造用備品": [], "外注費": [], "製造用消耗品": []
+        "樹脂": [], "変動費": [], "製造用備品": [], "外注費": []
     }
 
     for r in r792.json()["records"]:
