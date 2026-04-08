@@ -936,6 +936,11 @@
           <span x-show="!smLoading">読み込み</span>
           <span x-show="smLoading">読み込み中…</span>
         </button>
+        <button class="btn btn-secondary" @click="smRecalcAndLoad()" :disabled="smLoading"
+          style="padding:7px 16px;font-size:13px;" title="Kintoneの最新データから再集計してApp793を更新します">
+          <span x-show="!smLoading">再集計</span>
+          <span x-show="smLoading"><span class="spinner"></span></span>
+        </button>
         <span x-show="smError" x-text="smError" style="color:#e74c3c;font-size:13px;"></span>
       </div>
     </div>
@@ -1143,6 +1148,7 @@ function app() {
     smYear:    {{ current_year }},
     smMonth:   {{ current_month }},
     smLoading: false,
+    smLoadingMsg: '読み込み中…',
     smSummary: null,
     smDetails: null,
     smError:   '',
@@ -1178,11 +1184,37 @@ function app() {
 
     async smLoad() {
       this.smLoading = true;
+      this.smLoadingMsg = '読み込み中…';
       this.smError   = '';
       this.smSummary = null;
       this.smDetails = null;
       const ym = this.smGetYM();
       try {
+        const [sr, dr] = await Promise.all([
+          fetch(`/api/summary?ym=${encodeURIComponent(ym)}`).then(r => r.json()),
+          fetch(`/api/summary/details?ym=${encodeURIComponent(ym)}`).then(r => r.json()),
+        ]);
+        this.smSummary = sr.summary;
+        this.smDetails = dr.details;
+        if (!this.smSummary) this.smError = `${ym} のサマリーデータがありません（先に「再集計」を実行してください）`;
+      } catch(e) {
+        this.smError = 'エラー: ' + e.message;
+      } finally {
+        this.smLoading = false;
+      }
+    },
+
+    async smRecalcAndLoad() {
+      this.smLoading = true;
+      this.smLoadingMsg = '再集計中…';
+      this.smError   = '';
+      this.smSummary = null;
+      this.smDetails = null;
+      const ym = this.smGetYM();
+      try {
+        const res = await fetch(`/api/run-summary?ym=${encodeURIComponent(ym)}`, { method: 'POST' });
+        if (!res.ok) { const e = await res.json(); throw new Error(e.detail || '再集計失敗'); }
+        this.smLoadingMsg = '読み込み中…';
         const [sr, dr] = await Promise.all([
           fetch(`/api/summary?ym=${encodeURIComponent(ym)}`).then(r => r.json()),
           fetch(`/api/summary/details?ym=${encodeURIComponent(ym)}`).then(r => r.json()),
