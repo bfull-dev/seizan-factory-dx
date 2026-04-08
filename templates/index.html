@@ -1262,7 +1262,7 @@ function app() {
     },
     pinBack() { this.pinDigits = this.pinDigits.slice(0, -1); this.pinError = false; },
     pinCheck() {
-      if (this.pinDigits === '5342') {
+      if (this.pinDigits === '1234') {
         sessionStorage.setItem('pin_ok', '1');
         this.pinScreen = false;
       } else {
