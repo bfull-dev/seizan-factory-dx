@@ -920,7 +920,7 @@
               </tr>
             </thead>
             <tbody>
-              <template x-for="item in inventory" :key="item.品目名">
+              <template x-for="item in inventory.filter(i => Number(i.現在庫数) > 0)" :key="item.品目名">
                 <tr>
                   <td x-text="item.品目名"></td>
                   <td x-text="item.区分"></td>
