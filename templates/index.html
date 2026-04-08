@@ -798,7 +798,6 @@
                     <option>樹脂</option>
                     <option>変動費（製造用）</option>
                     <option>製造用消耗品</option>
-                    <option>その他</option>
                   </select>
                 </td>
                 <!-- 数量 -->
@@ -1701,10 +1700,12 @@ function app() {
         if (this.utRows[ri]._status === '登録済') this.utRows[ri]._status = '';
       }
       const q = (e?.type === 'focus' ? '' : val.trim()).toLowerCase();
+      // 在庫数0の品目はオートコンプリートに表示しない
+      const inStock = this.inventory.filter(i => Number(i.現在庫数) > 0);
       if (!q) {
-        this.utRows[ri]._acItems = this.inventory.slice(0, 10);
+        this.utRows[ri]._acItems = inStock.slice(0, 10);
       } else {
-        this.utRows[ri]._acItems = this.inventory.filter(item =>
+        this.utRows[ri]._acItems = inStock.filter(item =>
           item.品目名.toLowerCase().includes(q)
         ).slice(0, 10);
       }
