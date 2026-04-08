@@ -4,6 +4,7 @@ import os
 import io
 import base64
 import json
+import traceback
 import httpx
 from typing import Any
 from dotenv import load_dotenv
@@ -36,6 +37,20 @@ def _post_headers(token: str) -> dict:
 
 def _base() -> str:
     return f"https://{DOMAIN}/k/v1"
+
+
+def _raise_for_status(resp: httpx.Response) -> None:
+    """raise_for_status の上位互換: Kintone エラーレスポンスの本文を例外に含める"""
+    try:
+        resp.raise_for_status()
+    except httpx.HTTPStatusError as e:
+        try:
+            body = resp.json()
+            msg = body.get("message") or body.get("detail") or json.dumps(body, ensure_ascii=False)
+        except Exception:
+            msg = resp.text[:500]
+        print(f"[Kintone ERROR] {resp.status_code} {e.request.url}: {msg}")
+        raise RuntimeError(f"Kintone {resp.status_code}: {msg}") from e
 
 
 # ─── 在庫リスト（App 791）─────────────────────────────────────
@@ -456,9 +471,9 @@ async def create_purchase_record(data: dict[str, Any]) -> dict:
         record["ドル円"]   = {"value": str(data.get("ドル円", "160"))}
 
     payload = {"app": APP_PURCHASE, "record": record}
-    async with httpx.AsyncClient(timeout=10) as client:
+    async with httpx.AsyncClient(timeout=30) as client:
         resp = await client.post(url, json=payload, headers=_post_headers(TOKEN_794))
-        resp.raise_for_status()
+        _raise_for_status(resp)
         return resp.json()
 
 
@@ -672,9 +687,9 @@ async def get_recent_purchases(ym: str, limit: int = 500) -> list[dict]:
         ("fields[15]", "暫定"),
         ("query", query),
     ]
-    async with httpx.AsyncClient(timeout=10) as client:
+    async with httpx.AsyncClient(timeout=30) as client:
         resp = await client.get(url, params=params, headers=_get_headers(TOKEN_794))
-        resp.raise_for_status()
+        _raise_for_status(resp)
         records = resp.json()["records"]
 
     return [

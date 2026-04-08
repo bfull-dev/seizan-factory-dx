@@ -291,6 +291,7 @@ class PurchaseBulkIn(BaseModel):
 async def create_purchases_bulk(body: PurchaseBulkIn, background_tasks: BackgroundTasks):
     """複数の購入レコードを一括登録する"""
     try:
+        import traceback as _tb
         results = []
         for row in body.rows:
             merged = {**body.header, **row.model_dump()}
@@ -320,6 +321,8 @@ async def create_purchases_bulk(body: PurchaseBulkIn, background_tasks: Backgrou
             background_tasks.add_task(_run_summary, ym)
         return {"count": len(results), "results": results}
     except Exception as e:
+        print(f"[purchases-bulk ERROR] {e}")
+        import traceback as _tb; _tb.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 
