@@ -391,12 +391,17 @@ def main():
     )
     総売上 = shipping + oem
 
+    # 在庫状況ラベル: "在庫状況 ｜ 2026年4月末時点" の形式で生成
+    y, m = ym.split("/")
+    在庫状況ラベル = f"在庫状況 ｜ {y}年{int(m)}月末時点"
+
     values = {
-        "出荷売上_税抜":  shipping,
-        "OEM売上_税抜":   oem,
+        "出荷売上_税抜":        shipping,
+        "OEM売上_税抜":         oem,
         **usage,
         **expenses,
-        "期末在庫評価額": end_inventory,
+        "期末在庫評価額":       end_inventory,
+        "在庫状況_期末ラベル":  在庫状況ラベル,
     }
 
     print("[6] 月別サマリー upsert 中...")
