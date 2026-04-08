@@ -354,6 +354,9 @@ def main():
         now = datetime.now()
         ym = f"{now.year}/{now.month:02d}"
 
+    # "2026-03" / "2026/03" どちらで渡されても "/" 形式に統一
+    ym = ym[:4] + "/" + ym[5:7]
+
     print(f"=== 月別サマリー集計開始: {ym} ===")
 
     if not TOKEN_793:
