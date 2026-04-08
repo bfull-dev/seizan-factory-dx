@@ -46,10 +46,21 @@ def _raise_for_status(resp: httpx.Response) -> None:
     except httpx.HTTPStatusError as e:
         try:
             body = resp.json()
-            msg = body.get("message") or body.get("detail") or json.dumps(body, ensure_ascii=False)
+            msg = body.get("message") or body.get("detail") or ""
+            # フィールドレベルのエラー詳細を追加
+            errors = body.get("errors", {})
+            if errors:
+                details = "; ".join(
+                    f"{k}: {', '.join(v.get('messages', []))}"
+                    for k, v in errors.items()
+                )
+                msg = f"{msg} | 詳細: {details}"
+            if not msg:
+                msg = json.dumps(body, ensure_ascii=False)
         except Exception:
             msg = resp.text[:500]
         print(f"[Kintone ERROR] {resp.status_code} {e.request.url}: {msg}")
+        print(f"[Kintone REQUEST BODY] {resp.request.content[:1000].decode('utf-8', errors='replace')}")
         raise RuntimeError(f"Kintone {resp.status_code}: {msg}") from e
 
 

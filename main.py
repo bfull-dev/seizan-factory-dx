@@ -164,6 +164,7 @@ async def purchase_history(ym: str):
         has_provisional = any(r.get("暫定") for r in records)
         return {"records": records, "has_provisional": has_provisional}
     except Exception as e:
+        import traceback as _tb; _tb.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 
