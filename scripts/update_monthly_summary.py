@@ -270,6 +270,77 @@ def aggregate_expenses(ym: str) -> dict:
     return result
 
 
+def aggregate_inventory(ym: str) -> int:
+    """
+    月末時点の在庫評価額を計算する
+    = Σ（品目ごとの 月末在庫数 × 移動平均単価）
+
+    月末在庫数 = 現在庫数
+                + 対象月より後の使用量（App792）  ← 使用分を戻す
+                - 対象月より後の入庫量（App794, 反映済）  ← 後から入った分を除く
+
+    単価は App791 の現在の移動平均単価を使用（価格履歴は保持されていないため）。
+    """
+    if not TOKEN_791:
+        print("  [WARN] KINTONE_TOKEN_791 未設定 → 期末在庫評価額 = 0")
+        return 0
+
+    _, month_end = ym_to_date_range(ym)
+
+    # Step1: App791 現在の在庫を取得
+    inv_records = get_all_records(
+        TOKEN_791, APP_INVENTORY, '品目名 != ""',
+        ["品目名", "現在庫数", "移動平均単価"]
+    )
+    qty_map: dict[str, float] = {}
+    price_map: dict[str, float] = {}
+    for r in inv_records:
+        name  = r["品目名"]["value"]
+        qty   = float(r["現在庫数"]["value"] or 0)
+        price = float(r["移動平均単価"]["value"] or 0)
+        if name not in qty_map or qty > qty_map[name]:
+            qty_map[name]   = qty
+            price_map[name] = price
+    print(f"  App791 在庫品目数: {len(qty_map)}")
+
+    # Step2: 対象月より後の使用量を加算（在庫から引かれた分を戻す）
+    在庫対象区分 = {"樹脂", "変動費（製造用）", "量産用材料", "量産用消耗品", "製造用消耗品"}
+    if TOKEN_792:
+        future_usage = get_all_records(
+            TOKEN_792, APP_USAGE,
+            f'入力種別 in ("使用材料・消耗品") and 対象年月 > "{ym}"',
+            ["品目名", "用途区分", "数量"]
+        )
+        for r in future_usage:
+            cat  = r["用途区分"]["value"]
+            if cat not in 在庫対象区分:
+                continue
+            name = r["品目名"]["value"]
+            qty  = float(r["数量"]["value"] or 0)
+            if name in qty_map:
+                qty_map[name] += qty
+        print(f"  月末以降の使用レコード（戻し分）: {len(future_usage)} 件")
+
+    # Step3: 対象月より後の入庫量を減算（後から追加された分を除く）
+    if TOKEN_794:
+        future_purchases = get_all_records(
+            TOKEN_794, APP_EXPENSE,
+            f'日付 > "{month_end}" and 在庫反映状況 in ("反映済") and 出金区分 in ("樹脂", "変動費（製造用）", "製造用消耗品")',
+            ["品目名", "購入数量"]
+        )
+        for r in future_purchases:
+            name = r["品目名"]["value"]
+            qty  = float(r["購入数量"]["value"] or 0)
+            if name in qty_map:
+                qty_map[name] = max(0.0, qty_map[name] - qty)
+        print(f"  月末以降の入庫レコード（除外分）: {len(future_purchases)} 件")
+
+    # Step4: 期末在庫評価額を算出
+    total = sum(int(qty_map[n] * price_map.get(n, 0)) for n in qty_map)
+    print(f"  期末在庫評価額: ¥{total:,}")
+    return total
+
+
 def main():
     if len(sys.argv) >= 2:
         ym = sys.argv[1]
@@ -295,6 +366,9 @@ def main():
     print("[4] 出金管理 集計中...")
     expenses = aggregate_expenses(ym)
 
+    print("[5] 期末在庫評価額 計算中...")
+    end_inventory = aggregate_inventory(ym)
+
     # 製造原価合計（CALC フィールドで自動計算されるが参考表示用に算出）
     # 製造原価 = 使用量ベース(App792) + 備品・外注費(App794)
     # ※製造用消耗品は在庫化のため usage["製造原価_変動費"] に含まれる
@@ -312,13 +386,14 @@ def main():
     総売上 = shipping + oem
 
     values = {
-        "出荷売上_税抜": shipping,
-        "OEM売上_税抜":  oem,
+        "出荷売上_税抜":  shipping,
+        "OEM売上_税抜":   oem,
         **usage,
         **expenses,
+        "期末在庫評価額": end_inventory,
     }
 
-    print("[5] 月別サマリー upsert 中...")
+    print("[6] 月別サマリー upsert 中...")
     upsert_summary(ym, values)
 
     print(f"=== 完了: {ym} のサマリーを更新しました ===")

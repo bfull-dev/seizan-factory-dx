@@ -386,9 +386,6 @@
     <button class="tab-btn" :class="{ active: activeTab === 'usage' }" @click="switchTab('usage')">
       在庫使用
     </button>
-    <button class="tab-btn" :class="{ active: activeTab === 'summary' }" @click="switchTab('summary')">
-      月別サマリー
-    </button>
   </div>
 </div>
 
@@ -941,9 +938,9 @@
 
 
   <!-- ══════════════════════════════════════════════════════════
-       月別サマリータブ (App 793 + 792 + 794)
+       月別サマリータブ (App 793) ※削除済み - Kintone App793で管理
   ══════════════════════════════════════════════════════════ -->
-  <div x-show="activeTab === 'summary'" x-cloak>
+  <div x-show="false" x-cloak>
 
     <!-- 年月セレクター -->
     <div class="card" style="padding:16px 24px;">
@@ -1174,92 +1171,6 @@ function app() {
       this.activeTab = tab;
       if (tab === 'purchase') this.ptLoadHistory();
       else if (tab === 'usage') this.loadHistory();
-      else if (tab === 'summary') this.smLoad();
-    },
-
-    // ─── 月別サマリータブ ──────────────────────────────
-    smYear:    {{ current_year }},
-    smMonth:   {{ current_month }},
-    smLoading: false,
-    smLoadingMsg: '読み込み中…',
-    smSummary: null,
-    smDetails: null,
-    smError:   '',
-
-    smCategories: [
-      { key: '樹脂',        label: '樹脂',        hasTanka: true,  kinLabel: '金額' },
-      { key: '変動費',      label: '変動費（製造用）', hasTanka: true,  kinLabel: '金額' },
-      { key: '製造用備品',  label: '製造用備品',  hasTanka: false, hasTax: true, kinLabel: '税込み額' },
-      { key: '外注費',      label: '外注費',      hasTanka: false, hasTax: true, kinLabel: '税込み額' },
-      { key: '製造用消耗品',label: '製造用消耗品（使用量ベース）',hasTanka: true, kinLabel: '金額' },
-    ],
-
-    smExpenseRows: [
-      { label: '固定費',       key: '固定費' },
-      { label: '人件費',       key: '人件費' },
-      { label: '人材派遣費',   key: '人材派遣費' },
-      { label: '水道光熱費',   key: '水道光熱費' },
-      { label: '福利厚生',     key: '福利厚生' },
-      { label: '開発・実験',   key: '開発_実験' },
-      { label: '事務用品',     key: '事務用品' },
-      { label: '輸送費・送料', key: '輸送費_送料' },
-      { label: 'その他費用',   key: 'その他費用' },
-    ],
-
-    smGetYM() {
-      return `${this.smYear}/${String(this.smMonth).padStart(2, '0')}`;
-    },
-
-    smCategoryTotal(key) {
-      if (!this.smDetails || !this.smDetails[key]) return 0;
-      return this.smDetails[key].reduce((s, r) => s + Number(r.金額 || 0), 0);
-    },
-
-    async smLoad() {
-      this.smLoading = true;
-      this.smLoadingMsg = '読み込み中…';
-      this.smError   = '';
-      this.smSummary = null;
-      this.smDetails = null;
-      const ym = this.smGetYM();
-      try {
-        const [sr, dr] = await Promise.all([
-          fetch(`/api/summary?ym=${encodeURIComponent(ym)}`).then(r => r.json()),
-          fetch(`/api/summary/details?ym=${encodeURIComponent(ym)}`).then(r => r.json()),
-        ]);
-        this.smSummary = sr.summary;
-        this.smDetails = dr.details;
-        if (!this.smSummary) this.smError = `${ym} のサマリーデータがありません（先に「再集計」を実行してください）`;
-      } catch(e) {
-        this.smError = 'エラー: ' + e.message;
-      } finally {
-        this.smLoading = false;
-      }
-    },
-
-    async smRecalcAndLoad() {
-      this.smLoading = true;
-      this.smLoadingMsg = '再集計中…';
-      this.smError   = '';
-      this.smSummary = null;
-      this.smDetails = null;
-      const ym = this.smGetYM();
-      try {
-        const res = await fetch(`/api/run-summary?ym=${encodeURIComponent(ym)}`, { method: 'POST' });
-        if (!res.ok) { const e = await res.json(); throw new Error(e.detail || '再集計失敗'); }
-        this.smLoadingMsg = '読み込み中…';
-        const [sr, dr] = await Promise.all([
-          fetch(`/api/summary?ym=${encodeURIComponent(ym)}`).then(r => r.json()),
-          fetch(`/api/summary/details?ym=${encodeURIComponent(ym)}`).then(r => r.json()),
-        ]);
-        this.smSummary = sr.summary;
-        this.smDetails = dr.details;
-        if (!this.smSummary) this.smError = `${ym} のサマリーデータがありません`;
-      } catch(e) {
-        this.smError = 'エラー: ' + e.message;
-      } finally {
-        this.smLoading = false;
-      }
     },
 
     // ─── PIN ─────────────────────────────────────────
