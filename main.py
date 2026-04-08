@@ -115,6 +115,7 @@ class PurchaseIn(BaseModel):
     ドル円:         float = 160
     備考:           str = ""
     暫定:           bool = False
+    支払い予定日:   str = ""
 
 
 class PurchaseUpdateIn(BaseModel):
@@ -126,6 +127,7 @@ class PurchaseUpdateIn(BaseModel):
     備考:       str = ""
     暫定:       bool = False
     対象年月:   str = ""  # サマリー自動再計算用
+    支払い予定日: str = ""
 
 
 @app.post("/api/purchase")

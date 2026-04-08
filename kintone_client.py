@@ -480,6 +480,8 @@ async def create_purchase_record(data: dict[str, Any]) -> dict:
     if data.get("課税対象") == "海外":
         record["ドル単価"] = {"value": str(data.get("ドル単価", ""))}
         record["ドル円"]   = {"value": str(data.get("ドル円", "160"))}
+    if data.get("支払い予定日"):
+        record["支払い予定日"] = {"value": data["支払い予定日"]}
 
     payload = {"app": APP_PURCHASE, "record": record}
     async with httpx.AsyncClient(timeout=30) as client:
@@ -509,6 +511,7 @@ async def get_purchase_record(record_id: str) -> dict:
         "ドル単価":      r["ドル単価"]["value"] or "0",
         "ドル円":        r["ドル円"]["value"] or "160",
         "備考":          r["備考"]["value"],
+        "支払い予定日":  r.get("支払い予定日", {}).get("value", "") or "",
     }
 
 
@@ -526,6 +529,8 @@ async def update_purchase_record(record_id: str, data: dict) -> dict:
         record["ドル単価"] = {"value": str(data["ドル単価"])}
     if data.get("ドル円"):
         record["ドル円"] = {"value": str(data["ドル円"])}
+    if data.get("支払い予定日"):
+        record["支払い予定日"] = {"value": data["支払い予定日"]}
     payload = {"app": APP_PURCHASE, "id": record_id, "record": record}
     async with httpx.AsyncClient(timeout=10) as client:
         resp = await client.put(
@@ -543,6 +548,8 @@ _PURCHASE_PROMPT = """\
 {
   "vendor": "請求元の会社名（この書類を発行した売り手・販売者の名称）。「御中」と書かれた請求先（買い手・自社）ではない",
   "date": "YYYY-MM-DD形式の請求日または納品日（不明なら空文字）",
+  "書類種別": "請求書 または 領収書 または 納品書 または 見積書 または その他",
+  "支払い予定日": "YYYY-MM-DD形式の支払期限（請求書に記載があれば抽出。領収書なら書類の日付を入れる。不明ならnull）",
   "currency": "JPY または USD",
   "exchange_rate": 0,
   "items": [
@@ -571,6 +578,9 @@ _PURCHASE_PROMPT = """\
 - 送料・配送料・運賃・freight・shipping などは必ず品目として抽出すること（小計・合計・subtotalの後に記載されていても見落とさない）
 - 手数料・梱包料・その他費用も同様に品目として抽出すること
 - 請求元（売り手）は書類の右上や下部・発行者欄に記載されることが多い。「御中」宛ての請求先（買い手）と混同しないこと
+- 請求書に「お支払い期限」「支払期日」「支払い期限」などがあれば支払い予定日に記載すること
+- 領収書（receipt/領収証）の場合は書類種別=領収書とし、支払い予定日=書類の日付を入れること
+- 支払い予定日が読み取れない場合はnullとすること
 - 必ずJSONのみを返すこと（余分な説明文不要）
 """
 
@@ -700,6 +710,7 @@ async def get_recent_purchases(ym: str, limit: int = 200) -> list[dict]:
         ("fields[13]", "課税対象"),
         ("fields[14]", "備考"),
         ("fields[15]", "暫定"),
+        ("fields[16]", "支払い予定日"),
         ("query", query),
     ]
     async with httpx.AsyncClient(timeout=30) as client:
@@ -725,6 +736,7 @@ async def get_recent_purchases(ym: str, limit: int = 200) -> list[dict]:
             "課税対象":      r["課税対象"]["value"],
             "備考":          r["備考"]["value"],
             "暫定":          bool(r["暫定"]["value"]),
+            "支払い予定日":  r.get("支払い予定日", {}).get("value", "") or "",
         }
         for r in records
     ]
@@ -774,12 +786,13 @@ async def get_monthly_summary(ym: str) -> dict | None:
         "粗利":             _v("粗利"),
         "粗利率":           _v("粗利率"),
         "設備投資":         _v("設備投資"),
+        "立替分":           _v("立替分"),
         "期末在庫評価額":   _v("期末在庫評価額"),
     }
 
 
-# 変動費として扱う用途区分（App 792）
-_変動費区分 = {"変動費（製造用）", "量産用材料", "量産用消耗品", "製造用消耗品"}
+# 変動費として扱う用途区分（App 792）※製造用消耗品は別カテゴリで集計
+_変動費区分 = {"変動費（製造用）", "量産用材料", "量産用消耗品"}
 
 
 async def get_manufacturing_cost_details(ym: str) -> dict:
@@ -820,7 +833,7 @@ async def get_manufacturing_cost_details(ym: str) -> dict:
         r794.raise_for_status()
 
     result: dict[str, list] = {
-        "樹脂": [], "変動費": [], "製造用備品": [], "外注費": []
+        "樹脂": [], "変動費": [], "製造用消耗品": [], "製造用備品": [], "外注費": []
     }
 
     for r in r792.json()["records"]:
@@ -835,6 +848,8 @@ async def get_manufacturing_cost_details(ym: str) -> dict:
         }
         if cat == "樹脂":
             result["樹脂"].append(item)
+        elif cat == "製造用消耗品":
+            result["製造用消耗品"].append(item)
         elif cat in _変動費区分:
             result["変動費"].append(item)
 
