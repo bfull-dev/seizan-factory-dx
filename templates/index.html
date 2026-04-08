@@ -702,8 +702,11 @@
       <!-- 共通ヘッダー情報 -->
       <div class="tbl-header-grid tbl-header-3">
         <div class="form-group">
-          <label>対象年月<span class="req">*</span></label>
-          <div style="display:flex;gap:6px;align-items:center;">
+          <label style="display:flex;align-items:center;gap:6px;">
+            履歴表示月
+            <span style="font-size:11px;color:#888;font-weight:normal;">（入力履歴のフィルター）</span>
+          </label>
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
             <select x-model="utHistYear" style="width:auto;">
               {% for y in range(current_year - 2, current_year + 2) %}
               <option value="{{ y }}" {% if y == current_year %}selected{% endif %}>{{ y }}年</option>
@@ -714,6 +717,9 @@
               <option value="{{ m }}" {% if m == current_month %}selected{% endif %}>{{ m }}月</option>
               {% endfor %}
             </select>
+            <button class="btn btn-secondary btn-sm" @click="utFillCurrentMonth()"
+              title="全行の対象年月に当月を入力します"
+              style="white-space:nowrap;">📅 当月を全行に入力</button>
           </div>
         </div>
         <div class="form-group">
@@ -742,6 +748,7 @@
               <th style="width:80px;">単価（円）</th>
               <th style="width:90px;">金額</th>
               <th style="min-width:110px;">備考</th>
+              <th style="width:120px;">対象年月<span class="req">*</span></th>
               <th style="width:72px;">在庫反映</th>
               <th style="width:32px;"></th>
               <th style="width:64px;">状態</th>
@@ -805,6 +812,12 @@
                 <td class="td-calc" x-text="'¥' + (row._金額||0).toLocaleString()"></td>
                 <!-- 備考 -->
                 <td><input type="text" :value="row.備考" @input="row.備考=$event.target.value" placeholder="任意"></td>
+                <!-- 対象年月 -->
+                <td>
+                  <input type="month" :value="row.対象年月" @change="row.対象年月=$event.target.value"
+                    style="width:115px;font-size:13px;"
+                    :style="{ border: !row.対象年月 ? '2px solid #e74c3c' : '' }">
+                </td>
                 <!-- 在庫反映ボタン -->
                 <td class="td-act">
                   <button class="reflect-btn"
@@ -863,13 +876,14 @@
           <table class="history-table">
             <thead>
               <tr>
-                <th>入力日</th><th>班別</th><th>品目名</th>
+                <th>対象年月</th><th>入力日</th><th>班別</th><th>品目名</th>
                 <th class="num">数量</th><th class="num">金額（円）</th>
               </tr>
             </thead>
             <tbody>
               <template x-for="r in history" :key="r.レコード番号">
                 <tr>
+                  <td x-text="r.対象年月 || '-'" style="color:#2980b9;font-weight:bold;white-space:nowrap;"></td>
                   <td x-text="r.入力日"></td>
                   <td x-text="r.班別"></td>
                   <td x-text="r.品目名"></td>
@@ -1646,11 +1660,22 @@ function app() {
     },
 
     utDefaultRow() {
+      // 当月をデフォルト値として設定 (YYYY-MM)
+      const now = new Date();
+      const defaultYM = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
       return {
         品目名: '', 用途区分: '', 数量: '', 単価: '', 単位: '',
-        備考: '', _金額: 0, _stock: null, _status: '', _submitting: false,
+        備考: '', 対象年月: defaultYM,
+        _金額: 0, _stock: null, _status: '', _submitting: false,
         _acItems: [], _acIndex: -1, _acTop: 0, _acLeft: 0, _acWidth: 280,
       };
+    },
+
+    utFillCurrentMonth() {
+      const now = new Date();
+      const ym = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+      this.utRows.forEach(r => { if (r._status !== '登録済') r.対象年月 = ym; });
+      this.showToast('当月（' + ym.replace('-', '/') + '）を全行に設定しました', 'ok');
     },
 
     utAddRow() { this.utRows.push(this.utDefaultRow()); },
@@ -1794,6 +1819,9 @@ function app() {
       if (!this.utHeader.班別 || !this.utHeader.入力日) {
         this.showToast('班別と入力日は必須です', 'err'); return;
       }
+      if (!row.対象年月) {
+        this.showToast('「' + (row.品目名||'行') + '」の対象年月を入力してください', 'err'); return;
+      }
       // 在庫超過チェック
       if (row._stock !== null) {
         const qty = parseFloat(row.数量) || 0;
@@ -1803,7 +1831,7 @@ function app() {
         }
       }
       row._submitting = true;
-      const ym = this.utGetYM();
+      const ym = row.対象年月.replace('-', '/'); // YYYY-MM → YYYY/MM
       const payload = {
         対象年月: ym, 入力日: this.utHeader.入力日, 班別: this.utHeader.班別,
         品目名: row.品目名.trim(),
@@ -1850,6 +1878,11 @@ function app() {
       }
       if (!this.utHeader.班別 || !this.utHeader.入力日) {
         this.showToast('班別と入力日は必須です', 'err'); return;
+      }
+      const missingYM = pending.filter(r => !r.対象年月);
+      if (missingYM.length) {
+        this.showToast('対象年月が未入力の行があります（' + missingYM.map(r => r.品目名||'（品目名未入力）').join('、') + '）', 'err');
+        return;
       }
       this.utSubmitting = true;
       try {

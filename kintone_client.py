@@ -220,6 +220,7 @@ async def get_recent_usage(ym: str, limit: int = 20) -> list[dict]:
         ("fields[3]", "品目名"),
         ("fields[4]", "数量"),
         ("fields[5]", "金額"),
+        ("fields[6]", "対象年月"),
         ("query", f'入力種別 in ("使用材料・消耗品") and 対象年月 = "{ym}" order by 作成日時 desc limit {limit}'),
     ]
     async with httpx.AsyncClient(timeout=10) as client:
@@ -230,6 +231,7 @@ async def get_recent_usage(ym: str, limit: int = 20) -> list[dict]:
     return [
         {
             "レコード番号": r["レコード番号"]["value"],
+            "対象年月":r["対象年月"]["value"],
             "入力日":  r["入力日"]["value"],
             "班別":    r["班別"]["value"],
             "品目名":  r["品目名"]["value"],
