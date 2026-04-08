@@ -151,11 +151,9 @@ def aggregate_usage(ym: str) -> dict:
         print("  [WARN] KINTONE_TOKEN_792 未設定 → 使用材料 = 0")
         return {"製造原価_樹脂": 0, "製造原価_変動費": 0}
 
-    d_from, d_to = ym_to_date_range(ym)
-    query = (
-        f'入力種別 in ("使用材料・消耗品")'
-        f' and 入力日 >= "{d_from}" and 入力日 <= "{d_to}"'
-    )
+    # 対象年月ベースで集計（入力日ではなく集計月で判断）
+    # 前月製造→翌月出荷のケースに対応するため対象年月を使用する
+    query = f'入力種別 in ("使用材料・消耗品") and 対象年月 = "{ym}"'
     変動費区分 = {"変動費（製造用）", "量産用材料", "量産用消耗品", "製造用消耗品"}
     対象区分   = {"樹脂"} | 変動費区分
 
@@ -174,7 +172,7 @@ def aggregate_usage(ym: str) -> dict:
         print(f"  App791 単価参照: {len(価格map)}品目")
 
     # App792 の数量を取得し、移動平均単価で集計
-    records = get_all_records(TOKEN_792, APP_USAGE, query, ["用途区分", "品目名", "数量", "金額"])
+    records = get_all_records(TOKEN_792, APP_USAGE, query, ["用途区分", "品目名", "数量", "金額", "対象年月"])
 
     result = {"製造原価_樹脂": 0, "製造原価_変動費": 0}
     for r in records:

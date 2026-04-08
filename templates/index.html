@@ -703,8 +703,8 @@
       <div class="tbl-header-grid tbl-header-3">
         <div class="form-group">
           <label style="display:flex;align-items:center;gap:6px;">
-            履歴表示月
-            <span style="font-size:11px;color:#888;font-weight:normal;">（入力履歴のフィルター）</span>
+            対象月
+            <span style="font-size:11px;color:#888;font-weight:normal;">（履歴フィルター兼用）</span>
           </label>
           <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
             <select x-model="utHistYear" style="width:auto;">
@@ -718,8 +718,8 @@
               {% endfor %}
             </select>
             <button class="btn btn-secondary btn-sm" @click="utFillCurrentMonth()"
-              title="全行の対象年月に当月を入力します"
-              style="white-space:nowrap;">📅 当月を全行に入力</button>
+              title="選択中の年月を全行の対象年月に入力します"
+              style="white-space:nowrap;">📅 全行に入力</button>
           </div>
         </div>
         <div class="form-group">
@@ -1672,10 +1672,10 @@ function app() {
     },
 
     utFillCurrentMonth() {
-      const now = new Date();
-      const ym = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+      // 「対象月」セレクターで選択中の年月を全行に設定
+      const ym = `${this.utHistYear}-${String(this.utHistMonth).padStart(2,'0')}`;
       this.utRows.forEach(r => { if (r._status !== '登録済') r.対象年月 = ym; });
-      this.showToast('当月（' + ym.replace('-', '/') + '）を全行に設定しました', 'ok');
+      this.showToast(ym.replace('-', '/') + ' を全行に設定しました', 'ok');
     },
 
     utAddRow() { this.utRows.push(this.utDefaultRow()); },
