@@ -304,14 +304,19 @@ def aggregate_inventory(ym: str) -> int:
     print(f"  App791 在庫品目数: {len(qty_map)}")
 
     # Step2: 対象月より後の使用量を加算（在庫から引かれた分を戻す）
+    # 注意: 対象年月はテキストフィールドのため Kintone クエリで > 比較不可。
+    #       全件取得して Python 側でフィルタする。
     在庫対象区分 = {"樹脂", "変動費（製造用）", "量産用材料", "量産用消耗品", "製造用消耗品"}
     if TOKEN_792:
-        future_usage = get_all_records(
+        all_usage = get_all_records(
             TOKEN_792, APP_USAGE,
-            f'入力種別 in ("使用材料・消耗品") and 対象年月 > "{ym}"',
-            ["品目名", "用途区分", "数量"]
+            '入力種別 in ("使用材料・消耗品")',
+            ["品目名", "用途区分", "数量", "対象年月"]
         )
-        for r in future_usage:
+        future_count = 0
+        for r in all_usage:
+            if r["対象年月"]["value"] <= ym:
+                continue  # 対象月以前はスキップ
             cat  = r["用途区分"]["value"]
             if cat not in 在庫対象区分:
                 continue
@@ -319,7 +324,8 @@ def aggregate_inventory(ym: str) -> int:
             qty  = float(r["数量"]["value"] or 0)
             if name in qty_map:
                 qty_map[name] += qty
-        print(f"  月末以降の使用レコード（戻し分）: {len(future_usage)} 件")
+            future_count += 1
+        print(f"  月末以降の使用レコード（戻し分）: {future_count} 件 / 全 {len(all_usage)} 件")
 
     # Step3: 対象月より後の入庫量を減算（後から追加された分を除く）
     if TOKEN_794:
