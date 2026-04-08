@@ -676,8 +676,10 @@ async def get_recent_purchases(ym: str, limit: int = 200) -> list[dict]:
     if "/" not in ym:
         raise ValueError(f"ym format error: {ym!r} (expected YYYY/MM)")
     year, month = ym.split("/")
+    import calendar
+    last_day = calendar.monthrange(int(year), int(month))[1]
     query = (
-        f'日付 >= "{year}-{month}-01" and 日付 <= "{year}-{month}-31" '
+        f'日付 >= "{year}-{month}-01" and 日付 <= "{year}-{month}-{last_day:02d}" '
         f'order by 日付 desc limit {limit}'
     )
     params = [
